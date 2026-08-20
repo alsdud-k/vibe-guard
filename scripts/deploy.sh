@@ -22,6 +22,8 @@ LAMBDAS=(
   "context_collector:vibe-guard-context-collector"
   "regression_detector:vibe-guard-regression-detector"
   "bedrock_reviewer:vibe-guard-bedrock-reviewer"
+  "semgrep_scanner:vibe-guard-semgrep-scanner"
+  "result_builder:vibe-guard-result-builder"
   "github_commenter:vibe-guard-github-commenter"
 )
 
@@ -85,6 +87,8 @@ ASL=$(cat "$ROOT_DIR/step_functions/workflow.asl.json" \
   | sed "s|\${ContextCollectorArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-context-collector|g" \
   | sed "s|\${RegressionDetectorArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-regression-detector|g" \
   | sed "s|\${BedrockReviewerArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-bedrock-reviewer|g" \
+  | sed "s|\${SemgrepScannerArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-semgrep-scanner|g" \
+  | sed "s|\${ResultBuilderArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-result-builder|g" \
   | sed "s|\${GithubCommenterArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-github-commenter|g")
 
 aws stepfunctions update-state-machine \

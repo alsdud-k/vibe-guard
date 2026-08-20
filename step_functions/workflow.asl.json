@@ -1,5 +1,5 @@
 {
-  "Comment": "VibeGuard Phase 3 — Regression Detection + Bedrock Review",
+  "Comment": "VibeGuard Phase 4 — Complete Pipeline with Parallel Analysis",
   "StartAt": "CollectPR",
   "States": {
     "CollectPR": {
@@ -44,7 +44,7 @@
         {
           "Variable": "$.relevance.level",
           "StringEquals": "SKIP",
-          "Next": "PostSkipComment"
+          "Next": "SkipAnalysis"
         },
         {
           "Variable": "$.relevance.level",
@@ -52,28 +52,95 @@
           "Next": "PostLowRiskComment"
         }
       ],
-      "Default": "CollectContext"
+      "Default": "ParallelAnalysis"
     },
 
-    "CollectContext": {
-      "Type": "Task",
-      "Resource": "${ContextCollectorArn}",
-      "TimeoutSeconds": 30,
-      "Retry": [
+    "ParallelAnalysis": {
+      "Type": "Parallel",
+      "ResultPath": "$.parallel_results",
+      "Branches": [
         {
-          "ErrorEquals": ["States.TaskFailed"],
-          "MaxAttempts": 1,
-          "IntervalSeconds": 2,
-          "BackoffRate": 1.5
+          "StartAt": "CollectContext",
+          "States": {
+            "CollectContext": {
+              "Type": "Task",
+              "Resource": "${ContextCollectorArn}",
+              "TimeoutSeconds": 30,
+              "Retry": [
+                {
+                  "ErrorEquals": ["States.TaskFailed"],
+                  "MaxAttempts": 1,
+                  "IntervalSeconds": 2,
+                  "BackoffRate": 1.5
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "ResultPath": "$.error",
+                  "Next": "ContextFallback"
+                }
+              ],
+              "End": true
+            },
+            "ContextFallback": {
+              "Type": "Pass",
+              "Result": {
+                "repository_context": {
+                  "evidence_files": [],
+                  "pattern_statistics": {},
+                  "error": "collection_failed"
+                }
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "SemgrepScan",
+          "States": {
+            "SemgrepScan": {
+              "Type": "Task",
+              "Resource": "${SemgrepScannerArn}",
+              "TimeoutSeconds": 60,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "ResultPath": "$.error",
+                  "Next": "SemgrepFallback"
+                }
+              ],
+              "End": true
+            },
+            "SemgrepFallback": {
+              "Type": "Pass",
+              "Result": {
+                "semgrep_results": {
+                  "findings": [],
+                  "scan_status": "skipped",
+                  "error": "scan_failed"
+                }
+              },
+              "End": true
+            }
+          }
         }
       ],
-      "Catch": [
-        {
-          "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.context_error",
-          "Next": "DetectRegression"
-        }
-      ],
+      "Next": "MergeParallelResults"
+    },
+
+    "MergeParallelResults": {
+      "Type": "Pass",
+      "Parameters": {
+        "repository.$": "$.repository",
+        "pull_request.$": "$.pull_request",
+        "installation_id.$": "$.installation_id",
+        "diff.$": "$.diff",
+        "vibeguard_config.$": "$.vibeguard_config",
+        "relevance.$": "$.relevance",
+        "repository_context.$": "$.parallel_results[0].repository_context",
+        "semgrep_results.$": "$.parallel_results[1].semgrep_results"
+      },
       "Next": "DetectRegression"
     },
 
@@ -107,6 +174,20 @@
         {
           "ErrorEquals": ["States.ALL"],
           "ResultPath": "$.bedrock_error",
+          "Next": "BuildResult"
+        }
+      ],
+      "Next": "BuildResult"
+    },
+
+    "BuildResult": {
+      "Type": "Task",
+      "Resource": "${ResultBuilderArn}",
+      "TimeoutSeconds": 15,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.build_error",
           "Next": "PostComment"
         }
       ],
@@ -147,15 +228,8 @@
       "End": true
     },
 
-    "PostSkipComment": {
-      "Type": "Task",
-      "Resource": "${GithubCommenterArn}",
-      "Parameters": {
-        "mode": "skip",
-        "input.$": "$"
-      },
-      "TimeoutSeconds": 15,
-      "End": true
+    "SkipAnalysis": {
+      "Type": "Succeed"
     },
 
     "HandleError": {

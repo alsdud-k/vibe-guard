@@ -1,17 +1,26 @@
+import decimal
 import json
+import logging
 import os
 import time
+from datetime import datetime
 
 import boto3
 import jwt
 import requests
 
 secrets_client = boto3.client('secretsmanager')
+dynamodb = boto3.resource('dynamodb')
 
 SECRET_NAME = os.environ.get('SECRET_NAME', 'vibe-guard/github-app')
-COMMENT_MARKER = '<!-- vibeguard-security-review -->'
+ANALYSIS_TABLE = 'vibe-guard-analysis-results'
+LOCK_TABLE = 'vibe-guard-execution-lock'
+LEGACY_COMMENT_MARKER = '<!-- vibeguard-security-review -->'
 
 GITHUB_API = 'https://api.github.com'
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 _secret_cache: dict | None = None
 
@@ -45,13 +54,13 @@ def generate_installation_token(installation_id: str, app_id: str, private_key: 
     return response.json()['token']
 
 
-def find_existing_comment(repo_full_name: str, pr_number: int, headers: dict) -> int | None:
+def find_existing_comment(repo_full_name: str, pr_number: int, markers: list[str], headers: dict) -> int | None:
     url = f'{GITHUB_API}/repos/{repo_full_name}/issues/{pr_number}/comments'
     response = requests.get(url, headers=headers, timeout=10)
     response.raise_for_status()
-
     for comment in response.json():
-        if COMMENT_MARKER in (comment.get('body') or ''):
+        body = comment.get('body') or ''
+        if any(m in body for m in markers):
             return comment['id']
     return None
 
@@ -70,128 +79,89 @@ def update_comment(repo_full_name: str, comment_id: int, body: str, headers: dic
     return response.json()
 
 
-SEVERITY_ICON = {'CRITICAL': '🚨', 'HIGH': '🔴', 'MEDIUM': '🟡', 'LOW': '🟢'}
+def create_review(repo_full_name: str, pr_number: int, commit_sha: str, action: str, message: str, headers: dict):
+    url = f'{GITHUB_API}/repos/{repo_full_name}/pulls/{pr_number}/reviews'
+    try:
+        requests.post(url, headers=headers, timeout=10, json={
+            'commit_id': commit_sha,
+            'event': action,
+            'body': f'🛡️ VibeGuard: {message}',
+        })
+    except Exception as e:
+        logger.warning(f"create_review failed (non-fatal): {e}")
 
 
-def _format_findings_section(findings: list) -> str:
-    if not findings:
-        return ''
-
-    # Summary table
-    rows = []
-    for f in findings:
-        icon = SEVERITY_ICON.get(f.get('severity', ''), '⚪')
-        file_ref = f.get('affected_file', '')
-        line = f.get('affected_line')
-        if line:
-            file_ref = f"{file_ref}:{line}"
-        rows.append(f"| {icon} **{f.get('severity', '?')}** | {f.get('title', '')} | `{file_ref}` |")
-
-    table = "| 심각도 | 제목 | 파일 |\n|---|---|---|\n" + '\n'.join(rows)
-
-    # Detail blocks
-    details_parts = []
-    for f in findings:
-        icon = SEVERITY_ICON.get(f.get('severity', ''), '⚪')
-        detail = f"### {icon} [{f.get('severity', '?')}] {f.get('title', '')}\n\n"
-        detail += f"**문제:** {f.get('issue', '')}\n\n"
-        if f.get('repository_evidence'):
-            detail += "**근거:**\n" + '\n'.join(f"- {e}" for e in f['repository_evidence']) + "\n\n"
-        detail += f"**권고사항:** {f.get('recommendation', '')}\n"
-        details_parts.append(detail)
-
-    details = '\n'.join(details_parts)
-
-    return f"\n## Findings ({len(findings)}개)\n\n{table}\n\n<details>\n<summary>상세 내용 보기</summary>\n\n{details}\n</details>\n"
+def _to_decimal(obj):
+    if isinstance(obj, float):
+        return decimal.Decimal(str(round(obj, 4)))
+    elif isinstance(obj, dict):
+        return {k: _to_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_to_decimal(i) for i in obj]
+    return obj
 
 
-def _format_dismissed_section(dismissed: list) -> str:
-    if not dismissed:
-        return ''
-    items = '\n'.join(f"- **{d.get('candidate_type', '?')}**: {d.get('reason', '')}" for d in dismissed)
-    return f"\n<details>\n<summary>기각된 후보 ({len(dismissed)}개)</summary>\n\n{items}\n\n</details>\n"
+def save_to_dynamodb(event, final_result):
+    try:
+        table = dynamodb.Table(ANALYSIS_TABLE)
+        repo = event['repository']
+        pr = event['pull_request']
+        bedrock_review = event.get('bedrock_review') or {}
+
+        simplified_findings = [
+            {
+                'title': f.get('title', ''),
+                'severity': f.get('severity', ''),
+                'category': f.get('category', ''),
+                'affected_file': f.get('affected_file', ''),
+                'affected_line': f.get('affected_line'),
+                'final_confidence': f.get('final_confidence', 0),
+            }
+            for f in final_result.get('findings', [])
+        ]
+
+        item = {
+            'repository': repo['full_name'],
+            'pr_commit': f"PR#{pr['number']}#SHA#{pr['head_sha']}",
+            'analysis_status': 'COMPLETED',
+            'analysis_mode': final_result.get('analysis_mode', 'unknown'),
+            'security_relevance': (event.get('relevance') or {}).get('level', 'UNKNOWN'),
+            'risk_score': final_result.get('risk_score', 0),
+            'risk_level': final_result.get('risk_level', 'UNKNOWN'),
+            'review_action': (final_result.get('review_action') or {}).get('action', 'COMMENT'),
+            'findings_count': len(final_result.get('findings', [])),
+            'findings': simplified_findings,
+            'dismissed_count': len(final_result.get('dismissed_candidates', [])),
+            'bedrock_input_tokens': bedrock_review.get('input_tokens', 0),
+            'bedrock_output_tokens': bedrock_review.get('output_tokens', 0),
+            'bedrock_model': bedrock_review.get('model_used', 'none'),
+            'pr_title': pr.get('title', ''),
+            'pr_branch': pr.get('head_branch', ''),
+            'files_changed': (event.get('diff') or {}).get('total_files_changed', 0),
+            'config_source': (event.get('vibeguard_config') or {}).get('source', 'unknown'),
+            'created_at': datetime.utcnow().isoformat(),
+            'ttl': int(time.time()) + 90 * 24 * 60 * 60,
+        }
+
+        table.put_item(Item=_to_decimal(item))
+        logger.info(json.dumps({'message': 'Saved to DynamoDB', 'repository': repo['full_name'], 'pr_number': pr['number']}))
+    except Exception as e:
+        logger.error(f"save_to_dynamodb failed (non-fatal): {e}")
 
 
-def build_analysis_comment(pr: dict, diff: dict, relevance: dict | None, repository_context: dict | None, bedrock_review: dict | None = None) -> str:
-    commit_short = pr['head_sha'][:7]
-    files_changed = diff.get('total_files_changed', 0)
-    additions = diff.get('total_additions', 0)
-    deletions = diff.get('total_deletions', 0)
-    truncated = diff.get('truncated', False)
-    relevance_level = relevance.get('level', 'UNKNOWN') if relevance else 'UNKNOWN'
-    security_files = relevance.get('security_files', []) if relevance else []
-
-    truncated_note = f"\n> ⚠️ PR이 커서 상위 {len(diff.get('files', []))}개 파일만 분석했습니다.\n" if truncated else ""
-
-    if bedrock_review and bedrock_review.get('findings') is not None:
-        findings = bedrock_review.get('findings', [])
-        dismissed = bedrock_review.get('dismissed_candidates', [])
-        summary_text = bedrock_review.get('summary', '')
-        model_note = bedrock_review.get('model_used', '').replace('anthropic.', '').split('-20')[0]
-
-        if findings:
-            critical_high = [f for f in findings if f.get('severity') in ('CRITICAL', 'HIGH')]
-            status_line = f"🔴 **보안 이슈 {len(findings)}개 발견** ({len(critical_high)}개 HIGH+)" if critical_high else f"🟡 **보안 이슈 {len(findings)}개 발견**"
-        else:
-            status_line = "✅ **보안 이슈 없음** — Bedrock 분석 완료"
-
-        findings_section = _format_findings_section(findings)
-        dismissed_section = _format_dismissed_section(dismissed)
-        summary_section = f"\n**요약:** {summary_text}\n" if summary_text else ""
-
-        return f"""{COMMENT_MARKER}
-## 🛡️ VibeGuard Security Review
-
-{status_line}
-{summary_section}
-| | |
-|---|---|
-| **PR** | #{pr['number']} {pr['title']} |
-| **Commit** | `{commit_short}` |
-| **Files Changed** | {files_changed} (+{additions} / -{deletions}) |
-| **보안 관련 파일** | {len(security_files)}개 |
-| **Relevance** | {relevance_level} |
-{truncated_note}{findings_section}{dismissed_section}
----
-<sub>VibeGuard v0.3 • {model_note} • Relevance: {relevance_level}</sub>
-"""
-
-    # Bedrock not yet run or failed — show context-only status
-    context_lines = []
-    if repository_context and repository_context.get('evidence_files'):
-        for ef in repository_context['evidence_files'][:5]:
-            terms = ', '.join(ef.get('matched_terms', []))
-            context_lines.append(f"- `{ef['file']}` ({ef['domain']}): {terms}")
-
-    context_section = ""
-    if context_lines:
-        context_section = "\n**수집된 보안 컨텍스트:**\n" + "\n".join(context_lines) + "\n"
-    elif repository_context is not None:
-        context_section = "\n**보안 컨텍스트:** 관련 파일 없음\n"
-
-    return f"""{COMMENT_MARKER}
-## 🛡️ VibeGuard Security Review
-
-⏳ 분석 중
-
-| | |
-|---|---|
-| **PR** | #{pr['number']} {pr['title']} |
-| **Commit** | `{commit_short}` |
-| **Files Changed** | {files_changed} (+{additions} / -{deletions}) |
-| **보안 관련 파일** | {len(security_files)}개 |
-| **Relevance** | {relevance_level} |
-{truncated_note}{context_section}
----
-<sub>VibeGuard v0.3 • Relevance: {relevance_level}</sub>
-"""
+def release_execution_lock(repo_full_name: str, pr_number: int):
+    try:
+        table = dynamodb.Table(LOCK_TABLE)
+        table.delete_item(Key={'pr_key': f"{repo_full_name}:{pr_number}"})
+    except Exception as e:
+        logger.warning(f"release_execution_lock failed (non-fatal): {e}")
 
 
 def build_low_risk_comment(pr: dict, diff: dict, relevance: dict | None) -> str:
     files_changed = diff.get('total_files_changed', 0)
     relevance_level = relevance.get('level', 'LOW') if relevance else 'LOW'
 
-    return f"""{COMMENT_MARKER}
+    return f"""{LEGACY_COMMENT_MARKER}
 ## 🛡️ VibeGuard Security Review
 
 ✅ **보안 이슈 없음**
@@ -204,31 +174,12 @@ def build_low_risk_comment(pr: dict, diff: dict, relevance: dict | None) -> str:
 | **보안 관련 파일** | 0개 |
 
 ---
-<sub>VibeGuard v0.2 • Relevance: {relevance_level}</sub>
-"""
-
-
-def build_skip_comment(pr: dict, diff: dict) -> str:
-    files_changed = diff.get('total_files_changed', 0)
-
-    return f"""{COMMENT_MARKER}
-## 🛡️ VibeGuard Security Review
-
-⏭️ **분석 건너뜀**
-
-이 PR의 변경 파일은 보안 분석 대상이 아닙니다 (이미지, lock 파일 등).
-
-| | |
-|---|---|
-| **변경 파일** | {files_changed}개 |
-
----
-<sub>VibeGuard v0.2 • Relevance: SKIP</sub>
+<sub>VibeGuard v0.4 • Relevance: {relevance_level}</sub>
 """
 
 
 def build_error_comment(pr: dict) -> str:
-    return f"""{COMMENT_MARKER}
+    return f"""{LEGACY_COMMENT_MARKER}
 ## 🛡️ VibeGuard Security Review
 
 ⚠️ **분석 중 오류가 발생했습니다**
@@ -236,50 +187,89 @@ def build_error_comment(pr: dict) -> str:
 분석 파이프라인에서 오류가 발생했습니다. 잠시 후 커밋을 다시 푸시하거나 문제가 지속되면 관리자에게 문의하세요.
 
 ---
-<sub>VibeGuard v0.2</sub>
+<sub>VibeGuard v0.4</sub>
 """
 
 
+def handle_full_result(event, headers):
+    repo = event['repository']
+    pr = event['pull_request']
+    final_result = event.get('final_result')
+
+    if not final_result:
+        logger.error('handle_full_result called without final_result in event')
+        comment_body = build_error_comment(pr)
+        markers = [LEGACY_COMMENT_MARKER]
+    else:
+        comment_body = final_result['comment_body']
+        markers = [final_result['comment_marker'], LEGACY_COMMENT_MARKER]
+
+    existing_id = find_existing_comment(repo['full_name'], pr['number'], markers, headers)
+
+    if existing_id:
+        update_comment(repo['full_name'], existing_id, comment_body, headers)
+        logger.info(f"Updated comment {existing_id} on PR #{pr['number']}")
+    else:
+        result = create_comment(repo['full_name'], pr['number'], comment_body, headers)
+        logger.info(f"Created comment {result.get('id')} on PR #{pr['number']}")
+
+    if final_result:
+        review_action = final_result.get('review_action', {})
+        if review_action.get('action') == 'REQUEST_CHANGES':
+            create_review(
+                repo['full_name'],
+                pr['number'],
+                pr['head_sha'],
+                'REQUEST_CHANGES',
+                review_action.get('message', ''),
+                headers,
+            )
+
+        save_to_dynamodb(event, final_result)
+        release_execution_lock(repo['full_name'], pr['number'])
+
+    return {
+        'status': 'completed',
+        'risk_score': (final_result or {}).get('risk_score', 0),
+        'risk_level': (final_result or {}).get('risk_level', 'UNKNOWN'),
+        'findings_count': len((final_result or {}).get('findings', [])),
+    }
+
+
 def lambda_handler(event, context):
-    # Step Functions may wrap the event with a mode parameter
     mode = event.get('mode', 'analysis')
     inner = event.get('input', event) if mode in ('low_risk', 'error', 'skip') else event
 
     repo = inner['repository']
     pr = inner['pull_request']
     installation_id = inner['installation_id']
-    diff = inner.get('diff', {})
-    relevance = inner.get('relevance')
-    repository_context = inner.get('repository_context')
-    bedrock_review = inner.get('bedrock_review')
 
     secrets = get_secrets()
-    token = generate_installation_token(
-        installation_id,
-        secrets['app_id'],
-        secrets['private_key'],
-    )
+    token = generate_installation_token(installation_id, secrets['app_id'], secrets['private_key'])
     headers = {
         'Authorization': f'token {token}',
         'Accept': 'application/vnd.github.v3+json',
     }
 
+    if mode == 'analysis':
+        return handle_full_result(inner, headers)
+
+    diff = inner.get('diff', {})
+    relevance = inner.get('relevance')
+
     if mode == 'low_risk':
         comment_body = build_low_risk_comment(pr, diff, relevance)
-    elif mode == 'skip':
-        comment_body = build_skip_comment(pr, diff)
     elif mode == 'error':
         comment_body = build_error_comment(pr)
     else:
-        comment_body = build_analysis_comment(pr, diff, relevance, repository_context, bedrock_review)
+        return {'status': 'skipped'}
 
-    existing_comment_id = find_existing_comment(repo['full_name'], pr['number'], headers)
-
-    if existing_comment_id:
-        update_comment(repo['full_name'], existing_comment_id, comment_body, headers)
-        print(f"Updated comment {existing_comment_id} on PR #{pr['number']} (mode={mode})")
+    existing_id = find_existing_comment(repo['full_name'], pr['number'], [LEGACY_COMMENT_MARKER], headers)
+    if existing_id:
+        update_comment(repo['full_name'], existing_id, comment_body, headers)
+        logger.info(f"Updated comment {existing_id} on PR #{pr['number']} (mode={mode})")
     else:
         result = create_comment(repo['full_name'], pr['number'], comment_body, headers)
-        print(f"Created comment {result.get('id')} on PR #{pr['number']} (mode={mode})")
+        logger.info(f"Created comment {result.get('id')} on PR #{pr['number']} (mode={mode})")
 
-    return {**inner, 'comment_posted': True}
+    return {'status': mode, 'comment_posted': True}

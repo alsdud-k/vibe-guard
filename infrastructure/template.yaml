@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: VibeGuard - GitHub PR Security Review Service (Phase 3)
+Description: VibeGuard - GitHub PR Security Review Service (Phase 4)
 
 Parameters:
   SecretName:
@@ -161,6 +161,44 @@ Resources:
       RetentionInDays: 14
 
   # ──────────────────────────────────────────
+  # Lambda: semgrep-scanner
+  # ──────────────────────────────────────────
+  SemgrepScannerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: vibe-guard-semgrep-scanner
+      CodeUri: ../lambdas/semgrep_scanner/
+      Handler: handler.lambda_handler
+      MemorySize: 512
+      Timeout: 60
+      Role: !GetAtt SemgrepScannerRole.Arn
+
+  SemgrepScannerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/vibe-guard-semgrep-scanner
+      RetentionInDays: 14
+
+  # ──────────────────────────────────────────
+  # Lambda: result-builder
+  # ──────────────────────────────────────────
+  ResultBuilderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: vibe-guard-result-builder
+      CodeUri: ../lambdas/result_builder/
+      Handler: handler.lambda_handler
+      MemorySize: 256
+      Timeout: 15
+      Role: !GetAtt ResultBuilderRole.Arn
+
+  ResultBuilderLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/vibe-guard-result-builder
+      RetentionInDays: 14
+
+  # ──────────────────────────────────────────
   # Lambda: github-commenter
   # ──────────────────────────────────────────
   GithubCommenterFunction:
@@ -194,6 +232,8 @@ Resources:
         ContextCollectorArn: !GetAtt ContextCollectorFunction.Arn
         RegressionDetectorArn: !GetAtt RegressionDetectorFunction.Arn
         BedrockReviewerArn: !GetAtt BedrockReviewerFunction.Arn
+        SemgrepScannerArn: !GetAtt SemgrepScannerFunction.Arn
+        ResultBuilderArn: !GetAtt ResultBuilderFunction.Arn
         GithubCommenterArn: !GetAtt GithubCommenterFunction.Arn
       Role: !GetAtt StepFunctionsRole.Arn
       Logging:
@@ -411,23 +451,64 @@ Resources:
               - Effect: Allow
                 Action: bedrock:InvokeModel
                 Resource:
-                  # US cross-region inference profiles can route to any of these
-                  # destination Regions, so the role must allow the underlying
-                  # foundation model ARNs as well as the inference profile ARN.
-                  - 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku*'
-                  - 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet*'
-                  - 'arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-haiku*'
-                  - 'arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet*'
-                  - 'arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku*'
-                  - 'arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet*'
-                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku*'
-                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet*'
+                  # Wildcard region required: us.* cross-region inference profiles
+                  # route across us-east-1/us-east-2/us-west-2 at runtime.
+                  - 'arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku*'
+                  - 'arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet*'
+                  - !Sub 'arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku*'
+                  - !Sub 'arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet*'
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-bedrock-reviewer:*'
+
+  SemgrepScannerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: vibe-guard-semgrep-scanner-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SemgrepScannerPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-semgrep-scanner:*'
+
+  ResultBuilderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: vibe-guard-result-builder-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ResultBuilderPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-result-builder:*'
 
   GithubCommenterRole:
     Type: AWS::IAM::Role
@@ -448,6 +529,14 @@ Resources:
               - Effect: Allow
                 Action: secretsmanager:GetSecretValue
                 Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:vibe-guard/github-app*'
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !GetAtt AnalysisResultsTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt ExecutionLockTable.Arn
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
@@ -482,6 +571,8 @@ Resources:
                   - !GetAtt ContextCollectorFunction.Arn
                   - !GetAtt RegressionDetectorFunction.Arn
                   - !GetAtt BedrockReviewerFunction.Arn
+                  - !GetAtt SemgrepScannerFunction.Arn
+                  - !GetAtt ResultBuilderFunction.Arn
                   - !GetAtt GithubCommenterFunction.Arn
               - Effect: Allow
                 Action:
