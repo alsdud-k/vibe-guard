@@ -1,5 +1,5 @@
 {
-  "Comment": "VibeGuard Phase 1 — Basic Pipeline",
+  "Comment": "VibeGuard Phase 2 — Relevance Filter + Context Collection",
   "StartAt": "CollectPR",
   "States": {
     "CollectPR": {
@@ -21,8 +21,62 @@
           "Next": "HandleError"
         }
       ],
+      "Next": "FilterRelevance"
+    },
+
+    "FilterRelevance": {
+      "Type": "Task",
+      "Resource": "${RelevanceFilterArn}",
+      "TimeoutSeconds": 15,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "HandleError"
+        }
+      ],
+      "Next": "CheckRelevance"
+    },
+
+    "CheckRelevance": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.relevance.level",
+          "StringEquals": "SKIP",
+          "Next": "PostSkipComment"
+        },
+        {
+          "Variable": "$.relevance.level",
+          "StringEquals": "LOW",
+          "Next": "PostLowRiskComment"
+        }
+      ],
+      "Default": "CollectContext"
+    },
+
+    "CollectContext": {
+      "Type": "Task",
+      "Resource": "${ContextCollectorArn}",
+      "TimeoutSeconds": 30,
+      "Retry": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "MaxAttempts": 1,
+          "IntervalSeconds": 2,
+          "BackoffRate": 1.5
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.context_error",
+          "Next": "PostComment"
+        }
+      ],
       "Next": "PostComment"
     },
+
     "PostComment": {
       "Type": "Task",
       "Resource": "${GithubCommenterArn}",
@@ -37,11 +91,45 @@
       ],
       "End": true
     },
-    "HandleError": {
-      "Type": "Pass",
-      "Result": {
-        "error": "Pipeline failed at CollectPR step"
+
+    "PostLowRiskComment": {
+      "Type": "Task",
+      "Resource": "${GithubCommenterArn}",
+      "Parameters": {
+        "mode": "low_risk",
+        "input.$": "$"
       },
+      "TimeoutSeconds": 15,
+      "Retry": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "MaxAttempts": 2,
+          "IntervalSeconds": 1,
+          "BackoffRate": 1.5
+        }
+      ],
+      "End": true
+    },
+
+    "PostSkipComment": {
+      "Type": "Task",
+      "Resource": "${GithubCommenterArn}",
+      "Parameters": {
+        "mode": "skip",
+        "input.$": "$"
+      },
+      "TimeoutSeconds": 15,
+      "End": true
+    },
+
+    "HandleError": {
+      "Type": "Task",
+      "Resource": "${GithubCommenterArn}",
+      "Parameters": {
+        "mode": "error",
+        "input.$": "$"
+      },
+      "TimeoutSeconds": 15,
       "End": true
     }
   }

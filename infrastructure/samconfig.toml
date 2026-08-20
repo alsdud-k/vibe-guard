@@ -3,7 +3,7 @@ version = 0.1
 [default.global.parameters]
 stack_name = "vibe-guard"
 region = "us-east-1"
-capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
 confirm_changeset = true
 disable_rollback = false
 
@@ -12,6 +12,7 @@ use_container = true
 
 [default.deploy.parameters]
 resolve_s3 = true
+force_upload = true
 s3_prefix = "vibe-guard"
 parameter_overrides = "SecretName=\"vibe-guard/github-app\""
 image_repositories = []

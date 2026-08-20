@@ -11,7 +11,12 @@ GitHub PR 생성/업데이트
   → webhook-validator Lambda (HMAC 서명 검증)
   → Step Functions Express Workflow
       → pr-collector Lambda (PR Diff + .vibeguard.yml 수집)
-      → github-commenter Lambda (PR Comment 등록)
+      → relevance-filter Lambda (보안 관련성 판정)
+          ├─ SKIP  → "분석 건너뜀" Comment
+          ├─ LOW   → "보안 이슈 없음" Comment
+          └─ HIGH/MEDIUM
+              → context-collector Lambda (Repository 보안 컨텍스트 수집)
+              → github-commenter Lambda (분석 결과 Comment 등록)
 ```
 
 ## 프로젝트 구조
@@ -25,7 +30,11 @@ vibe-guard/
 ├── lambdas/
 │   ├── webhook_validator/  # HMAC 검증 + Step Functions 트리거
 │   ├── pr_collector/       # GitHub API — PR diff + .vibeguard.yml
+│   ├── relevance_filter/   # 보안 관련성 분류 (HIGH/MEDIUM/LOW/SKIP)
+│   ├── context_collector/  # GitHub Contents API — 기존 보안 코드 수집
 │   └── github_commenter/   # PR Comment 생성/업데이트
+├── scripts/
+│   └── deploy.sh           # Lambda 코드 + Step Functions 배포 스크립트
 ├── step_functions/
 │   └── workflow.asl.json   # Step Functions 상태 머신 정의
 ├── tests/
@@ -38,7 +47,7 @@ vibe-guard/
 | 리소스 | 용도 |
 |---|---|
 | API Gateway | GitHub Webhook 수신 엔드포인트 |
-| Lambda × 3 | webhook-validator, pr-collector, github-commenter |
+| Lambda × 5 | webhook-validator, pr-collector, relevance-filter, context-collector, github-commenter |
 | Step Functions | 분석 파이프라인 오케스트레이션 (Express Workflow) |
 | DynamoDB × 2 | 분석 결과 저장, 실행 Lock |
 | Secrets Manager | GitHub App Credential 관리 |
@@ -67,22 +76,29 @@ aws secretsmanager create-secret \
   }'
 ```
 
-### 빌드 및 배포
+### 최초 인프라 배포
 
 ```bash
 cd infrastructure
-
-# 빌드 (Docker 컨테이너 사용 — Linux 호환 바이너리 생성)
 sam build --template-file template.yaml
-
-# 첫 배포
 sam deploy --guided --template-file template.yaml
-
-# 이후 배포
-sam deploy --template-file template.yaml
 ```
 
 배포 완료 후 Outputs에 출력된 `WebhookEndpoint` URL을 GitHub App Webhook URL에 등록합니다.
+
+### 코드 배포 (이후)
+
+Lambda 코드 또는 Step Functions ASL 변경 시:
+
+```bash
+./scripts/deploy.sh
+```
+
+인프라(template.yaml) 변경까지 반영할 때:
+
+```bash
+./scripts/deploy.sh --infra
+```
 
 ### .vibeguard.yml (선택)
 
@@ -100,6 +116,14 @@ auth_patterns:
 protected_paths:
   - path: "/admin"
     required_auth: admin
+
+scan_paths:
+  - "backend/"
+  - "app/"
+
+exclude_paths:
+  - "tests/"
+  - "migrations/"
 ```
 
 ### 테스트
@@ -107,3 +131,11 @@ protected_paths:
 ```bash
 python3 -m unittest tests/test_webhook.py -v
 ```
+
+## 구현 현황
+
+- [x] Phase 1 — AWS 인프라 및 GitHub Webhook 파이프라인
+- [x] Phase 2 — 보안 관련성 필터 + Repository Context 수집
+- [ ] Phase 3 — Bedrock 기반 Security Regression 탐지
+- [ ] Phase 4 — 결과 저장 및 대시보드
+- [ ] Phase 5 — 고도화 및 운영 안정화

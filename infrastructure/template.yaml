@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: VibeGuard - GitHub PR Security Review Service (Phase 1)
+Description: VibeGuard - GitHub PR Security Review Service (Phase 2)
 
 Parameters:
   SecretName:
@@ -85,6 +85,44 @@ Resources:
       RetentionInDays: 14
 
   # ──────────────────────────────────────────
+  # Lambda: relevance-filter
+  # ──────────────────────────────────────────
+  RelevanceFilterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: vibe-guard-relevance-filter
+      CodeUri: ../lambdas/relevance_filter/
+      Handler: handler.lambda_handler
+      MemorySize: 256
+      Timeout: 15
+      Role: !GetAtt RelevanceFilterRole.Arn
+
+  RelevanceFilterLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/vibe-guard-relevance-filter
+      RetentionInDays: 14
+
+  # ──────────────────────────────────────────
+  # Lambda: context-collector
+  # ──────────────────────────────────────────
+  ContextCollectorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: vibe-guard-context-collector
+      CodeUri: ../lambdas/context_collector/
+      Handler: handler.lambda_handler
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt ContextCollectorRole.Arn
+
+  ContextCollectorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/vibe-guard-context-collector
+      RetentionInDays: 14
+
+  # ──────────────────────────────────────────
   # Lambda: github-commenter
   # ──────────────────────────────────────────
   GithubCommenterFunction:
@@ -114,6 +152,8 @@ Resources:
       DefinitionUri: ../step_functions/workflow.asl.json
       DefinitionSubstitutions:
         PrCollectorArn: !GetAtt PrCollectorFunction.Arn
+        RelevanceFilterArn: !GetAtt RelevanceFilterFunction.Arn
+        ContextCollectorArn: !GetAtt ContextCollectorFunction.Arn
         GithubCommenterArn: !GetAtt GithubCommenterFunction.Arn
       Role: !GetAtt StepFunctionsRole.Arn
       Logging:
@@ -240,6 +280,55 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-pr-collector:*'
 
+  RelevanceFilterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: vibe-guard-relevance-filter-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RelevanceFilterPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-relevance-filter:*'
+
+  ContextCollectorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: vibe-guard-context-collector-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ContextCollectorPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:vibe-guard/github-app*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-context-collector:*'
+
   GithubCommenterRole:
     Type: AWS::IAM::Role
     Properties:
@@ -289,6 +378,8 @@ Resources:
                 Action: lambda:InvokeFunction
                 Resource:
                   - !GetAtt PrCollectorFunction.Arn
+                  - !GetAtt RelevanceFilterFunction.Arn
+                  - !GetAtt ContextCollectorFunction.Arn
                   - !GetAtt GithubCommenterFunction.Arn
               - Effect: Allow
                 Action:
