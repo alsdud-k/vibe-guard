@@ -20,8 +20,19 @@ LAMBDAS=(
   "pr_collector:vibe-guard-pr-collector"
   "relevance_filter:vibe-guard-relevance-filter"
   "context_collector:vibe-guard-context-collector"
+  "regression_detector:vibe-guard-regression-detector"
+  "bedrock_reviewer:vibe-guard-bedrock-reviewer"
   "github_commenter:vibe-guard-github-commenter"
 )
+
+# ── 인프라 변경 (--infra 플래그 시에만, Lambda 코드 배포보다 먼저) ───────────
+if [[ "$1" == "--infra" ]]; then
+  echo "▶ CloudFormation 인프라 배포 중..."
+  cd "$ROOT_DIR/infrastructure"
+  sam build --use-container --template-file template.yaml
+  sam deploy --template-file template.yaml
+  cd "$ROOT_DIR"
+fi
 
 # ── Lambda 코드 배포 ──────────────────────────────────────────────────────────
 echo "▶ Lambda 코드 배포 중..."
@@ -43,7 +54,7 @@ for entry in "${LAMBDAS[@]}"; do
       -v "$build_dir":/out \
       -v "$lambda_dir":/src \
       "$BUILD_IMAGE" \
-      pip install -r /src/requirements.txt -t /out --quiet --no-cache-dir --only-binary=:all:
+      pip install -r /src/requirements.txt -t /out --quiet --no-cache-dir
 
     if grep -q '^cryptography' "$req_file" && ! find "$build_dir/cryptography/hazmat/bindings" -name '_rust*.so' -type f | grep -q .; then
       echo "ERROR: $name build is missing cryptography's native _rust extension." >&2
@@ -72,6 +83,8 @@ ASL=$(cat "$ROOT_DIR/step_functions/workflow.asl.json" \
   | sed "s|\${PrCollectorArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-pr-collector|g" \
   | sed "s|\${RelevanceFilterArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-relevance-filter|g" \
   | sed "s|\${ContextCollectorArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-context-collector|g" \
+  | sed "s|\${RegressionDetectorArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-regression-detector|g" \
+  | sed "s|\${BedrockReviewerArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-bedrock-reviewer|g" \
   | sed "s|\${GithubCommenterArn}|arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:vibe-guard-github-commenter|g")
 
 aws stepfunctions update-state-machine \
@@ -80,13 +93,5 @@ aws stepfunctions update-state-machine \
   --region "$REGION" \
   --query 'updateDate' \
   --output text
-
-# ── 인프라 변경 (--infra 플래그 시에만) ──────────────────────────────────────
-if [[ "$1" == "--infra" ]]; then
-  echo "▶ CloudFormation 인프라 배포 중..."
-  cd "$ROOT_DIR/infrastructure"
-  sam build --use-container --template-file template.yaml
-  sam deploy --template-file template.yaml
-fi
 
 echo "✅ 배포 완료"

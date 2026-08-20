@@ -1,0 +1,1 @@
+# boto3/botocore included in Lambda runtime — no external dependencies

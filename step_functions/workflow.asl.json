@@ -1,5 +1,5 @@
 {
-  "Comment": "VibeGuard Phase 2 — Relevance Filter + Context Collection",
+  "Comment": "VibeGuard Phase 3 — Regression Detection + Bedrock Review",
   "StartAt": "CollectPR",
   "States": {
     "CollectPR": {
@@ -71,6 +71,42 @@
         {
           "ErrorEquals": ["States.ALL"],
           "ResultPath": "$.context_error",
+          "Next": "DetectRegression"
+        }
+      ],
+      "Next": "DetectRegression"
+    },
+
+    "DetectRegression": {
+      "Type": "Task",
+      "Resource": "${RegressionDetectorArn}",
+      "TimeoutSeconds": 30,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.regression_error",
+          "Next": "BedrockReview"
+        }
+      ],
+      "Next": "BedrockReview"
+    },
+
+    "BedrockReview": {
+      "Type": "Task",
+      "Resource": "${BedrockReviewerArn}",
+      "TimeoutSeconds": 60,
+      "Retry": [
+        {
+          "ErrorEquals": ["ThrottlingException", "BedrockThrottling", "ServiceUnavailableException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.bedrock_error",
           "Next": "PostComment"
         }
       ],

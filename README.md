@@ -16,6 +16,8 @@ GitHub PR 생성/업데이트
           ├─ LOW   → "보안 이슈 없음" Comment
           └─ HIGH/MEDIUM
               → context-collector Lambda (Repository 보안 컨텍스트 수집)
+                      → regression-detector Lambda (Rule 기반 Regression 후보 탐지)
+              → bedrock-reviewer Lambda (Claude — 최종 보안 판단)
               → github-commenter Lambda (분석 결과 Comment 등록)
 ```
 
@@ -32,6 +34,8 @@ vibe-guard/
 │   ├── pr_collector/       # GitHub API — PR diff + .vibeguard.yml
 │   ├── relevance_filter/   # 보안 관련성 분류 (HIGH/MEDIUM/LOW/SKIP)
 │   ├── context_collector/  # GitHub Contents API — 기존 보안 코드 수집
+│   ├── regression_detector/ # Rule 기반 Authorization Regression 후보 탐지
+│   ├── bedrock_reviewer/   # Amazon Bedrock (Claude) — 최종 보안 판단
 │   └── github_commenter/   # PR Comment 생성/업데이트
 ├── scripts/
 │   └── deploy.sh           # Lambda 코드 + Step Functions 배포 스크립트
@@ -47,7 +51,7 @@ vibe-guard/
 | 리소스 | 용도 |
 |---|---|
 | API Gateway | GitHub Webhook 수신 엔드포인트 |
-| Lambda × 5 | webhook-validator, pr-collector, relevance-filter, context-collector, github-commenter |
+| Lambda × 7 | webhook-validator, pr-collector, relevance-filter, context-collector, regression-detector, bedrock-reviewer, github-commenter |
 | Step Functions | 분석 파이프라인 오케스트레이션 (Express Workflow) |
 | DynamoDB × 2 | 분석 결과 저장, 실행 Lock |
 | Secrets Manager | GitHub App Credential 관리 |
@@ -131,11 +135,3 @@ exclude_paths:
 ```bash
 python3 -m unittest tests/test_webhook.py -v
 ```
-
-## 구현 현황
-
-- [x] Phase 1 — AWS 인프라 및 GitHub Webhook 파이프라인
-- [x] Phase 2 — 보안 관련성 필터 + Repository Context 수집
-- [ ] Phase 3 — Bedrock 기반 Security Regression 탐지
-- [ ] Phase 4 — 결과 저장 및 대시보드
-- [ ] Phase 5 — 고도화 및 운영 안정화

@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: VibeGuard - GitHub PR Security Review Service (Phase 2)
+Description: VibeGuard - GitHub PR Security Review Service (Phase 3)
 
 Parameters:
   SecretName:
@@ -123,6 +123,44 @@ Resources:
       RetentionInDays: 14
 
   # ──────────────────────────────────────────
+  # Lambda: regression-detector
+  # ──────────────────────────────────────────
+  RegressionDetectorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: vibe-guard-regression-detector
+      CodeUri: ../lambdas/regression_detector/
+      Handler: handler.lambda_handler
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt RegressionDetectorRole.Arn
+
+  RegressionDetectorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/vibe-guard-regression-detector
+      RetentionInDays: 14
+
+  # ──────────────────────────────────────────
+  # Lambda: bedrock-reviewer
+  # ──────────────────────────────────────────
+  BedrockReviewerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: vibe-guard-bedrock-reviewer
+      CodeUri: ../lambdas/bedrock_reviewer/
+      Handler: handler.lambda_handler
+      MemorySize: 512
+      Timeout: 60
+      Role: !GetAtt BedrockReviewerRole.Arn
+
+  BedrockReviewerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/vibe-guard-bedrock-reviewer
+      RetentionInDays: 14
+
+  # ──────────────────────────────────────────
   # Lambda: github-commenter
   # ──────────────────────────────────────────
   GithubCommenterFunction:
@@ -154,6 +192,8 @@ Resources:
         PrCollectorArn: !GetAtt PrCollectorFunction.Arn
         RelevanceFilterArn: !GetAtt RelevanceFilterFunction.Arn
         ContextCollectorArn: !GetAtt ContextCollectorFunction.Arn
+        RegressionDetectorArn: !GetAtt RegressionDetectorFunction.Arn
+        BedrockReviewerArn: !GetAtt BedrockReviewerFunction.Arn
         GithubCommenterArn: !GetAtt GithubCommenterFunction.Arn
       Role: !GetAtt StepFunctionsRole.Arn
       Logging:
@@ -329,6 +369,66 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-context-collector:*'
 
+  RegressionDetectorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: vibe-guard-regression-detector-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RegressionDetectorPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-regression-detector:*'
+
+  BedrockReviewerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: vibe-guard-bedrock-reviewer-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BedrockReviewerPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: bedrock:InvokeModel
+                Resource:
+                  # US cross-region inference profiles can route to any of these
+                  # destination Regions, so the role must allow the underlying
+                  # foundation model ARNs as well as the inference profile ARN.
+                  - 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku*'
+                  - 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet*'
+                  - 'arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-haiku*'
+                  - 'arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet*'
+                  - 'arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku*'
+                  - 'arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-bedrock-reviewer:*'
+
   GithubCommenterRole:
     Type: AWS::IAM::Role
     Properties:
@@ -380,6 +480,8 @@ Resources:
                   - !GetAtt PrCollectorFunction.Arn
                   - !GetAtt RelevanceFilterFunction.Arn
                   - !GetAtt ContextCollectorFunction.Arn
+                  - !GetAtt RegressionDetectorFunction.Arn
+                  - !GetAtt BedrockReviewerFunction.Arn
                   - !GetAtt GithubCommenterFunction.Arn
               - Effect: Allow
                 Action:

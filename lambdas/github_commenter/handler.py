@@ -70,7 +70,49 @@ def update_comment(repo_full_name: str, comment_id: int, body: str, headers: dic
     return response.json()
 
 
-def build_analysis_comment(pr: dict, diff: dict, relevance: dict | None, repository_context: dict | None) -> str:
+SEVERITY_ICON = {'CRITICAL': '🚨', 'HIGH': '🔴', 'MEDIUM': '🟡', 'LOW': '🟢'}
+
+
+def _format_findings_section(findings: list) -> str:
+    if not findings:
+        return ''
+
+    # Summary table
+    rows = []
+    for f in findings:
+        icon = SEVERITY_ICON.get(f.get('severity', ''), '⚪')
+        file_ref = f.get('affected_file', '')
+        line = f.get('affected_line')
+        if line:
+            file_ref = f"{file_ref}:{line}"
+        rows.append(f"| {icon} **{f.get('severity', '?')}** | {f.get('title', '')} | `{file_ref}` |")
+
+    table = "| 심각도 | 제목 | 파일 |\n|---|---|---|\n" + '\n'.join(rows)
+
+    # Detail blocks
+    details_parts = []
+    for f in findings:
+        icon = SEVERITY_ICON.get(f.get('severity', ''), '⚪')
+        detail = f"### {icon} [{f.get('severity', '?')}] {f.get('title', '')}\n\n"
+        detail += f"**문제:** {f.get('issue', '')}\n\n"
+        if f.get('repository_evidence'):
+            detail += "**근거:**\n" + '\n'.join(f"- {e}" for e in f['repository_evidence']) + "\n\n"
+        detail += f"**권고사항:** {f.get('recommendation', '')}\n"
+        details_parts.append(detail)
+
+    details = '\n'.join(details_parts)
+
+    return f"\n## Findings ({len(findings)}개)\n\n{table}\n\n<details>\n<summary>상세 내용 보기</summary>\n\n{details}\n</details>\n"
+
+
+def _format_dismissed_section(dismissed: list) -> str:
+    if not dismissed:
+        return ''
+    items = '\n'.join(f"- **{d.get('candidate_type', '?')}**: {d.get('reason', '')}" for d in dismissed)
+    return f"\n<details>\n<summary>기각된 후보 ({len(dismissed)}개)</summary>\n\n{items}\n\n</details>\n"
+
+
+def build_analysis_comment(pr: dict, diff: dict, relevance: dict | None, repository_context: dict | None, bedrock_review: dict | None = None) -> str:
     commit_short = pr['head_sha'][:7]
     files_changed = diff.get('total_files_changed', 0)
     additions = diff.get('total_additions', 0)
@@ -79,6 +121,42 @@ def build_analysis_comment(pr: dict, diff: dict, relevance: dict | None, reposit
     relevance_level = relevance.get('level', 'UNKNOWN') if relevance else 'UNKNOWN'
     security_files = relevance.get('security_files', []) if relevance else []
 
+    truncated_note = f"\n> ⚠️ PR이 커서 상위 {len(diff.get('files', []))}개 파일만 분석했습니다.\n" if truncated else ""
+
+    if bedrock_review and bedrock_review.get('findings') is not None:
+        findings = bedrock_review.get('findings', [])
+        dismissed = bedrock_review.get('dismissed_candidates', [])
+        summary_text = bedrock_review.get('summary', '')
+        model_note = bedrock_review.get('model_used', '').replace('anthropic.', '').split('-20')[0]
+
+        if findings:
+            critical_high = [f for f in findings if f.get('severity') in ('CRITICAL', 'HIGH')]
+            status_line = f"🔴 **보안 이슈 {len(findings)}개 발견** ({len(critical_high)}개 HIGH+)" if critical_high else f"🟡 **보안 이슈 {len(findings)}개 발견**"
+        else:
+            status_line = "✅ **보안 이슈 없음** — Bedrock 분석 완료"
+
+        findings_section = _format_findings_section(findings)
+        dismissed_section = _format_dismissed_section(dismissed)
+        summary_section = f"\n**요약:** {summary_text}\n" if summary_text else ""
+
+        return f"""{COMMENT_MARKER}
+## 🛡️ VibeGuard Security Review
+
+{status_line}
+{summary_section}
+| | |
+|---|---|
+| **PR** | #{pr['number']} {pr['title']} |
+| **Commit** | `{commit_short}` |
+| **Files Changed** | {files_changed} (+{additions} / -{deletions}) |
+| **보안 관련 파일** | {len(security_files)}개 |
+| **Relevance** | {relevance_level} |
+{truncated_note}{findings_section}{dismissed_section}
+---
+<sub>VibeGuard v0.3 • {model_note} • Relevance: {relevance_level}</sub>
+"""
+
+    # Bedrock not yet run or failed — show context-only status
     context_lines = []
     if repository_context and repository_context.get('evidence_files'):
         for ef in repository_context['evidence_files'][:5]:
@@ -91,12 +169,10 @@ def build_analysis_comment(pr: dict, diff: dict, relevance: dict | None, reposit
     elif repository_context is not None:
         context_section = "\n**보안 컨텍스트:** 관련 파일 없음\n"
 
-    truncated_note = f"\n> ⚠️ PR이 커서 상위 {len(diff.get('files', []))}개 파일만 분석했습니다.\n" if truncated else ""
-
     return f"""{COMMENT_MARKER}
 ## 🛡️ VibeGuard Security Review
 
-⏳ 보안 컨텍스트 수집 완료 — Phase 3 Bedrock 분석 대기 중
+⏳ 분석 중
 
 | | |
 |---|---|
@@ -106,10 +182,8 @@ def build_analysis_comment(pr: dict, diff: dict, relevance: dict | None, reposit
 | **보안 관련 파일** | {len(security_files)}개 |
 | **Relevance** | {relevance_level} |
 {truncated_note}{context_section}
-> Phase 3에서 실제 보안 분석 결과가 여기에 표시됩니다.
-
 ---
-<sub>VibeGuard v0.2 • Relevance: {relevance_level}</sub>
+<sub>VibeGuard v0.3 • Relevance: {relevance_level}</sub>
 """
 
 
@@ -177,6 +251,7 @@ def lambda_handler(event, context):
     diff = inner.get('diff', {})
     relevance = inner.get('relevance')
     repository_context = inner.get('repository_context')
+    bedrock_review = inner.get('bedrock_review')
 
     secrets = get_secrets()
     token = generate_installation_token(
@@ -196,7 +271,7 @@ def lambda_handler(event, context):
     elif mode == 'error':
         comment_body = build_error_comment(pr)
     else:
-        comment_body = build_analysis_comment(pr, diff, relevance, repository_context)
+        comment_body = build_analysis_comment(pr, diff, relevance, repository_context, bedrock_review)
 
     existing_comment_id = find_existing_comment(repo['full_name'], pr['number'], headers)
 
