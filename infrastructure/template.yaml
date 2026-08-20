@@ -1,0 +1,317 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: VibeGuard - GitHub PR Security Review Service (Phase 1)
+
+Parameters:
+  SecretName:
+    Type: String
+    Default: vibe-guard/github-app
+    Description: AWS Secrets Manager secret name for GitHub App credentials
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        SECRET_NAME: !Ref SecretName
+        REGION: !Ref AWS::Region
+
+Resources:
+
+  # ──────────────────────────────────────────
+  # API Gateway
+  # ──────────────────────────────────────────
+  VibeGuardApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: vibe-guard-api
+      StageName: prod
+      TracingEnabled: true
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          ThrottlingBurstLimit: 100
+          ThrottlingRateLimit: 50
+
+  # ──────────────────────────────────────────
+  # Lambda: webhook-validator
+  # ──────────────────────────────────────────
+  WebhookValidatorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: vibe-guard-webhook-validator
+      CodeUri: ../lambdas/webhook_validator/
+      Handler: handler.lambda_handler
+      MemorySize: 256
+      Timeout: 15
+      Role: !GetAtt WebhookValidatorRole.Arn
+      Environment:
+        Variables:
+          WORKFLOW_ARN: !Ref VibeGuardWorkflow
+          LOCK_TABLE: !Ref ExecutionLockTable
+      Events:
+        WebhookPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref VibeGuardApi
+            Path: /webhook
+            Method: POST
+
+  WebhookValidatorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/vibe-guard-webhook-validator
+      RetentionInDays: 14
+
+  # ──────────────────────────────────────────
+  # Lambda: pr-collector
+  # ──────────────────────────────────────────
+  PrCollectorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: vibe-guard-pr-collector
+      CodeUri: ../lambdas/pr_collector/
+      Handler: handler.lambda_handler
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt PrCollectorRole.Arn
+
+  PrCollectorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/vibe-guard-pr-collector
+      RetentionInDays: 14
+
+  # ──────────────────────────────────────────
+  # Lambda: github-commenter
+  # ──────────────────────────────────────────
+  GithubCommenterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: vibe-guard-github-commenter
+      CodeUri: ../lambdas/github_commenter/
+      Handler: handler.lambda_handler
+      MemorySize: 256
+      Timeout: 15
+      Role: !GetAtt GithubCommenterRole.Arn
+
+  GithubCommenterLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/vibe-guard-github-commenter
+      RetentionInDays: 14
+
+  # ──────────────────────────────────────────
+  # Step Functions Express Workflow
+  # ──────────────────────────────────────────
+  VibeGuardWorkflow:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: vibe-guard-workflow
+      Type: EXPRESS
+      DefinitionUri: ../step_functions/workflow.asl.json
+      DefinitionSubstitutions:
+        PrCollectorArn: !GetAtt PrCollectorFunction.Arn
+        GithubCommenterArn: !GetAtt GithubCommenterFunction.Arn
+      Role: !GetAtt StepFunctionsRole.Arn
+      Logging:
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt StepFunctionsLogGroup.Arn
+        IncludeExecutionData: true
+        Level: ERROR
+
+  StepFunctionsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /vibe-guard/step-functions
+      RetentionInDays: 14
+
+  # ──────────────────────────────────────────
+  # DynamoDB Tables
+  # ──────────────────────────────────────────
+  AnalysisResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: vibe-guard-analysis-results
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: repository
+          AttributeType: S
+        - AttributeName: pr_commit
+          AttributeType: S
+      KeySchema:
+        - AttributeName: repository
+          KeyType: HASH
+        - AttributeName: pr_commit
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: vibe-guard
+
+  ExecutionLockTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: vibe-guard-execution-lock
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pr_key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pr_key
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: vibe-guard
+
+  # ──────────────────────────────────────────
+  # IAM Roles
+  # ──────────────────────────────────────────
+  WebhookValidatorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: vibe-guard-webhook-validator-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: WebhookValidatorPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:vibe-guard/github-app*'
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !Ref VibeGuardWorkflow
+              - Effect: Allow
+                # Express Workflow stop is best-effort; included for forward compatibility
+                Action: states:StopExecution
+                Resource: !Sub 'arn:aws:states:${AWS::Region}:${AWS::AccountId}:express:vibe-guard-workflow:*'
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt ExecutionLockTable.Arn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-webhook-validator:*'
+
+  PrCollectorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: vibe-guard-pr-collector-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PrCollectorPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:vibe-guard/github-app*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-pr-collector:*'
+
+  GithubCommenterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: vibe-guard-github-commenter-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: GithubCommenterPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:vibe-guard/github-app*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/vibe-guard-github-commenter:*'
+
+  StepFunctionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: vibe-guard-stepfunctions-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: StepFunctionsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !GetAtt PrCollectorFunction.Arn
+                  - !GetAtt GithubCommenterFunction.Arn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogDelivery
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:DescribeResourcePolicies
+                  - logs:GetLogDelivery
+                  - logs:ListLogDeliveries
+                  - logs:PutLogEvents
+                  - logs:PutResourcePolicy
+                  - logs:UpdateLogDelivery
+                Resource: "*"
+
+Outputs:
+  WebhookEndpoint:
+    Description: GitHub Webhook URL — paste this into GitHub App settings
+    Value: !Sub 'https://${VibeGuardApi}.execute-api.${AWS::Region}.amazonaws.com/prod/webhook'
+  VibeGuardWorkflowArn:
+    Value: !Ref VibeGuardWorkflow
+  AnalysisResultsTableName:
+    Value: !Ref AnalysisResultsTable
+  ExecutionLockTableName:
+    Value: !Ref ExecutionLockTable

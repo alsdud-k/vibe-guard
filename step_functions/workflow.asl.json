@@ -1,0 +1,48 @@
+{
+  "Comment": "VibeGuard Phase 1 — Basic Pipeline",
+  "StartAt": "CollectPR",
+  "States": {
+    "CollectPR": {
+      "Type": "Task",
+      "Resource": "${PrCollectorArn}",
+      "TimeoutSeconds": 30,
+      "Retry": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "MaxAttempts": 2,
+          "IntervalSeconds": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "HandleError"
+        }
+      ],
+      "Next": "PostComment"
+    },
+    "PostComment": {
+      "Type": "Task",
+      "Resource": "${GithubCommenterArn}",
+      "TimeoutSeconds": 15,
+      "Retry": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "MaxAttempts": 2,
+          "IntervalSeconds": 1,
+          "BackoffRate": 1.5
+        }
+      ],
+      "End": true
+    },
+    "HandleError": {
+      "Type": "Pass",
+      "Result": {
+        "error": "Pipeline failed at CollectPR step"
+      },
+      "End": true
+    }
+  }
+}
