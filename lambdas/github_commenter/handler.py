@@ -261,6 +261,17 @@ def lambda_handler(event, context):
         comment_body = build_low_risk_comment(pr, diff, relevance)
     elif mode == 'error':
         comment_body = build_error_comment(pr)
+    elif mode == 'skip':
+        comment_body = f"""{LEGACY_COMMENT_MARKER}
+## 🛡️ VibeGuard Security Review
+
+✅ **보안 이슈 없음**
+
+이 PR의 변경 파일은 보안 스캔 제외 경로(`exclude_paths`)에 해당합니다.
+
+---
+<sub>VibeGuard v0.4 • Relevance: SKIP</sub>
+"""
     else:
         return {'status': 'skipped'}
 

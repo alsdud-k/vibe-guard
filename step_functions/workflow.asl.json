@@ -229,7 +229,14 @@
     },
 
     "SkipAnalysis": {
-      "Type": "Succeed"
+      "Type": "Task",
+      "Resource": "${GithubCommenterArn}",
+      "Parameters": {
+        "mode": "skip",
+        "input.$": "$"
+      },
+      "ResultPath": null,
+      "End": true
     },
 
     "HandleError": {

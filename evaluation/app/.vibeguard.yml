@@ -1,0 +1,26 @@
+framework: fastapi
+language: python
+authentication: jwt
+
+auth_patterns:
+  admin: "Depends(require_admin)"
+  user: "Depends(get_current_user)"
+
+protected_paths:
+  - path: "/admin"
+    required_auth: admin
+  - path: "/internal"
+    required_auth: admin
+
+scan_paths:
+  - "backend/"
+
+exclude_paths:
+  - "tests/"
+  - "docs/"
+  - "migrations/"
+
+suppressions:
+  - file: "backend/routes/health.py"
+    rule: "authorization_regression"
+    reason: "Health check는 인증 불필요"

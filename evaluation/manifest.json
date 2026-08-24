@@ -1,0 +1,326 @@
+{
+  "version": "1.0",
+  "description": "VibeGuard Phase 5 — 30-case evaluation manifest",
+  "test_cases": [
+    {
+      "id": "S1",
+      "branch": "safe/readme-update",
+      "description": "README.md 수정",
+      "category": "safe",
+      "expected": {
+        "should_find": false,
+        "note": "문서 파일 변경 — SKIP 또는 LOW"
+      }
+    },
+    {
+      "id": "S2",
+      "branch": "safe/test-addition",
+      "description": "tests/ 디렉토리에 테스트 추가",
+      "category": "safe",
+      "expected": {
+        "should_find": false,
+        "note": "exclude_paths에 tests/ 포함"
+      }
+    },
+    {
+      "id": "S3",
+      "branch": "safe/public-endpoint",
+      "description": "/public/info GET 추가 (인증 불필요)",
+      "category": "safe",
+      "expected": {
+        "should_find": false,
+        "note": "public 경로는 인증 불필요"
+      }
+    },
+    {
+      "id": "S4",
+      "branch": "safe/admin-with-auth",
+      "description": "/admin/reports GET + require_admin",
+      "category": "safe",
+      "expected": {
+        "should_find": false,
+        "note": "정상적인 admin 보호 엔드포인트"
+      }
+    },
+    {
+      "id": "S5",
+      "branch": "safe/user-endpoint",
+      "description": "/users/profile GET + get_current_user",
+      "category": "safe",
+      "expected": {
+        "should_find": false,
+        "note": "정상적인 user 보호 엔드포인트"
+      }
+    },
+    {
+      "id": "S6",
+      "branch": "safe/docs-update",
+      "description": "docs/ 파일 수정",
+      "category": "safe",
+      "expected": {
+        "should_find": false,
+        "note": "exclude_paths에 docs/ 포함"
+      }
+    },
+    {
+      "id": "S7",
+      "branch": "safe/refactor-logic",
+      "description": "admin endpoint 내부 로직 변경 (auth 유지)",
+      "category": "safe",
+      "expected": {
+        "should_find": false,
+        "note": "auth Depends 유지 — Regression 없음"
+      }
+    },
+    {
+      "id": "S8",
+      "branch": "safe/custom-auth",
+      "description": "/admin/export + verify_and_require_admin 자체구현",
+      "category": "safe",
+      "expected": {
+        "should_find": false,
+        "note": "Bedrock이 custom auth 패턴을 안전하다 판단"
+      }
+    },
+    {
+      "id": "S9",
+      "branch": "safe/config-safe",
+      "description": "config.py에서 os.environ 사용 (정상)",
+      "category": "safe",
+      "expected": {
+        "should_find": false,
+        "note": "환경변수 참조 — 하드코딩 없음"
+      }
+    },
+    {
+      "id": "S10",
+      "branch": "safe/migration",
+      "description": "migrations/ 파일 추가",
+      "category": "safe",
+      "expected": {
+        "should_find": false,
+        "note": "exclude_paths에 migrations/ 포함"
+      }
+    },
+    {
+      "id": "A1",
+      "branch": "vuln/admin-no-auth",
+      "description": "/admin/users DELETE 인증 없음",
+      "category": "authorization",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "authorization"
+      }
+    },
+    {
+      "id": "A2",
+      "branch": "vuln/admin-wrong-level",
+      "description": "/admin/settings DELETE + get_current_user (admin 아님)",
+      "category": "authorization",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "authorization"
+      }
+    },
+    {
+      "id": "A3",
+      "branch": "vuln/admin-get-no-auth",
+      "description": "/admin/stats GET 인증 없음",
+      "category": "authorization",
+      "expected": {
+        "should_find": true,
+        "min_severity": "MEDIUM",
+        "expected_category": "authorization"
+      }
+    },
+    {
+      "id": "A4",
+      "branch": "vuln/admin-post-no-auth",
+      "description": "/admin/bulk-delete POST 인증 없음",
+      "category": "authorization",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "authorization"
+      }
+    },
+    {
+      "id": "A5",
+      "branch": "vuln/remove-auth",
+      "description": "기존 /admin/dashboard에서 require_admin 제거",
+      "category": "authorization",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_category": "authorization"
+      }
+    },
+    {
+      "id": "A6",
+      "branch": "vuln/internal-no-auth",
+      "description": "/internal/config GET 인증 없음",
+      "category": "authorization",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "authorization"
+      }
+    },
+    {
+      "id": "A7",
+      "branch": "vuln/admin-multiple",
+      "description": "/admin에 3개 endpoint 추가, 모두 인증 없음",
+      "category": "authorization",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "authorization"
+      }
+    },
+    {
+      "id": "A8",
+      "branch": "vuln/middleware-remove",
+      "description": "admin.py에서 require_admin import 제거 후 모든 auth 삭제",
+      "category": "authorization",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_category": "authorization"
+      }
+    },
+    {
+      "id": "A9",
+      "branch": "vuln/partial-auth",
+      "description": "/admin CRUD 4개 중 2개만 require_admin",
+      "category": "authorization",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "authorization"
+      }
+    },
+    {
+      "id": "A10",
+      "branch": "vuln/decorator-missing",
+      "description": "주석으로 @require_admin 언급하지만 Depends 없음",
+      "category": "authorization",
+      "expected": {
+        "should_find": true,
+        "min_severity": "MEDIUM",
+        "expected_category": "authorization"
+      }
+    },
+    {
+      "id": "E1",
+      "branch": "vuln/hardcoded-key",
+      "description": "API_KEY = \"sk-abc123...\" 하드코딩",
+      "category": "secret",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "secret"
+      }
+    },
+    {
+      "id": "E2",
+      "branch": "vuln/jwt-secret",
+      "description": "JWT_SECRET = \"mysecret\" 하드코딩",
+      "category": "secret",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "secret"
+      }
+    },
+    {
+      "id": "E3",
+      "branch": "vuln/db-password",
+      "description": "DB_PASSWORD = \"admin123\" 하드코딩",
+      "category": "secret",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "secret"
+      }
+    },
+    {
+      "id": "E4",
+      "branch": "vuln/env-in-code",
+      "description": "AWS_SECRET_ACCESS_KEY 값 직접 하드코딩",
+      "category": "secret",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_category": "secret"
+      }
+    },
+    {
+      "id": "E5",
+      "branch": "vuln/token-in-comment",
+      "description": "# token: ghp_xxxx 주석에 GitHub 토큰",
+      "category": "secret",
+      "expected": {
+        "should_find": true,
+        "min_severity": "MEDIUM",
+        "expected_category": "secret"
+      }
+    },
+    {
+      "id": "T1",
+      "branch": "vuln/no-login-check",
+      "description": "보호된 admin 페이지에 로그인 체크 없음",
+      "category": "authentication",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "authentication"
+      }
+    },
+    {
+      "id": "T2",
+      "branch": "vuln/token-verify-skip",
+      "description": "token 검증 로직 주석 처리",
+      "category": "authentication",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_category": "authentication"
+      }
+    },
+    {
+      "id": "T3",
+      "branch": "vuln/session-bypass",
+      "description": "session 검증 우회 코드 추가",
+      "category": "authentication",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "authentication"
+      }
+    },
+    {
+      "id": "G1",
+      "branch": "vuln/sql-injection",
+      "description": "f-string SQL injection",
+      "category": "injection",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "injection"
+      }
+    },
+    {
+      "id": "G2",
+      "branch": "vuln/command-injection",
+      "description": "subprocess.call(shell=True) command injection",
+      "category": "injection",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_category": "injection"
+      }
+    }
+  ]
+}

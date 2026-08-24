@@ -40,6 +40,11 @@ vibe-guard/
 │   ├── semgrep_scanner/    # Semgrep 정적 분석 (현재 stub)
 │   ├── result_builder/     # Evidence 구조화 + Risk Score + Comment 렌더링
 │   └── github_commenter/   # PR Comment 생성/업데이트 + DynamoDB 저장
+├── evaluation/
+│   ├── app/                # vibeguard-test-app 기반 코드 (FastAPI)
+│   ├── manifest.json       # 30개 테스트 케이스 정의
+│   ├── setup_test_repo.py  # 테스트 리포지토리 + 30개 브랜치 자동 생성
+│   └── test_runner.py      # E2E 평가 실행 + Precision/Recall/F1 측정
 ├── scripts/
 │   └── deploy.sh           # Lambda 코드 + Step Functions 배포 스크립트
 ├── step_functions/
@@ -138,3 +143,68 @@ exclude_paths:
 ```bash
 python3 -m unittest tests/test_webhook.py -v
 ```
+
+## 평가 방법
+
+### 1. 테스트 리포지토리 생성
+
+```bash
+# vibeguard-test-app 리포지토리를 GitHub에 먼저 생성(private)한 뒤:
+python evaluation/setup_test_repo.py \
+  --repo <your-username>/vibeguard-test-app \
+  --token <github-pat> \
+  [--create]   # API로 repo 자동 생성 시
+```
+
+30개 브랜치가 자동으로 push됩니다.
+
+| 카테고리 | 브랜치 수 | 설명 |
+|---|---|---|
+| Safe | 10 | 정상 변경 (Finding 없어야 함) |
+| Authorization Regression | 10 | 인증 누락/약화 |
+| Secret Exposure | 5 | 하드코딩 시크릿 |
+| Authentication Regression | 3 | 인증 로직 우회 |
+| Injection | 2 | SQL/Command injection |
+
+### 2. E2E 평가 실행
+
+```bash
+python evaluation/test_runner.py \
+  --repo <your-username>/vibeguard-test-app \
+  --token <github-pat> \
+  --timeout 180 \
+  --output evaluation/results/ \
+  [--close-prs]
+```
+
+### 3. 결과 확인
+
+```
+evaluation/results/
+├── results.json    # 케이스별 상세 결과
+├── metrics.json    # Precision / Recall / F1 / FPR
+├── report.md       # 마크다운 리포트
+└── latency.csv     # 케이스별 응답 시간
+```
+
+## 평가 결과
+
+30개 테스트 케이스 E2E 평가 결과 (2026-08-24 기준):
+
+| 지표 | 값 |
+|---|---|
+| **Precision** | **0.947** |
+| **Recall** | **0.900** |
+| **F1 Score** | **0.923** |
+| False Positive Rate | 0.100 |
+| TP / FP / TN / FN | 18 / 1 / 9 / 2 |
+| 평균 응답시간 | 21초 |
+
+### 카테고리별 결과
+
+| 카테고리 | Precision | Recall | F1 |
+|---|---|---|---|
+| Authentication | 1.000 | 1.000 | **1.000** |
+| Injection | 1.000 | 1.000 | **1.000** |
+| Authorization | 1.000 | 0.900 | 0.947 |
+| Secret | 1.000 | 0.800 | 0.889 |
