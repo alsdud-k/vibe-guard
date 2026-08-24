@@ -154,9 +154,10 @@ def classify_file(file, config):
             level = "HIGH"
             domains.add("authorization")
 
-    # HIGH: sensitive keywords in new code
+    # HIGH: sensitive keywords in new code (case-insensitive)
+    added_lines_lower = added_lines.lower()
     for keyword in RELEVANCE_RULES["HIGH"]["sensitive_keywords_new"]:
-        if keyword in added_lines:
+        if keyword.lower() in added_lines_lower:
             reasons.append(f"sensitive_keyword: {keyword}")
             level = "HIGH"
             domains.add("secret")

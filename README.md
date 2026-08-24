@@ -193,11 +193,11 @@ evaluation/results/
 
 | 지표 | 값 |
 |---|---|
-| **Precision** | **0.947** |
-| **Recall** | **0.900** |
-| **F1 Score** | **0.923** |
-| False Positive Rate | 0.100 |
-| TP / FP / TN / FN | 18 / 1 / 9 / 2 |
+| **Precision** | **1.000** |
+| **Recall** | **1.000** |
+| **F1 Score** | **1.000** |
+| False Positive Rate | 0.000 |
+| TP / FP / TN / FN | 20 / 0 / 10 / 0 |
 | 평균 응답시간 | 21초 |
 
 ### 카테고리별 결과
@@ -206,5 +206,5 @@ evaluation/results/
 |---|---|---|---|
 | Authentication | 1.000 | 1.000 | **1.000** |
 | Injection | 1.000 | 1.000 | **1.000** |
-| Authorization | 1.000 | 0.900 | 0.947 |
-| Secret | 1.000 | 0.800 | 0.889 |
+| Authorization | 1.000 | 1.000 | **1.000** |
+| Secret | 1.000 | 1.000 | **1.000** |

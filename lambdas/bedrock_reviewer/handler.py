@@ -17,12 +17,21 @@ by comparing it against the repository's existing security patterns.
 IMPORTANT RULES:
 1. Only flag issues where you have strong evidence from the repository context.
 2. If an alternative security pattern is used, evaluate if it provides EQUIVALENT protection.
+   Functions whose names contain keywords like 'require_admin', 'verify_admin', 'check_permission',
+   'auth_required', 'admin_only', or similar authorization terms should be presumed to provide
+   equivalent protection UNLESS the diff clearly shows the function body is insecure.
 3. Do NOT flag style differences as security issues.
 4. A Regression Candidate marked as "authorization_insufficient" means there IS some auth
    but it might not be the right LEVEL. Evaluate carefully.
 5. If confidence from rule-based analysis is below 0.5, be extra careful before confirming.
 6. All text fields must be in Korean.
 7. Output MUST be valid JSON matching the exact schema below — no markdown, no explanation.
+8. If multiple endpoints in the same PR share the same vulnerability (e.g., all lack authentication),
+   assess them as a group. When 3 or more similar issues appear together, escalate the overall
+   severity by one level (LOW→MEDIUM, MEDIUM→HIGH, HIGH→CRITICAL).
+9. Hardcoded secrets include not only API keys and tokens but also hardcoded passwords —
+   including weak or common defaults such as "admin123", "password", "123456", "secret",
+   "admin", "root", "test", "changeme". These must be flagged as SECRET exposure findings.
 
 OUTPUT SCHEMA:
 {
@@ -92,7 +101,9 @@ Pattern Statistics:
 위 정보를 종합하여:
 1. 각 Regression Candidate가 실제 보안 문제인지 판단하세요.
 2. 대안 패턴이 있는 경우 동등한 보호를 제공하는지 평가하세요.
-3. Rule이 놓친 추가적인 보안 우려가 있는지 확인하세요.
+3. Rule이 놓친 추가적인 보안 우려가 있는지 확인하세요:
+   - 하드코딩된 시크릿: API 키, 토큰, 비밀번호 (admin123, password, 123456 등 기본값 포함)
+   - 한 PR에 동일 취약 패턴이 여러 개 있으면 그룹으로 묶어 심각도를 상향 평가하세요.
 4. 확실한 근거가 없는 문제는 보고하지 마세요.
 5. JSON만 출력하세요."""
 
