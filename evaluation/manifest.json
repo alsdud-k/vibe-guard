@@ -1,325 +1,1365 @@
 {
-  "version": "1.0",
-  "description": "VibeGuard Phase 5 — 30-case evaluation manifest",
+  "version": "2.0",
+  "description": "VibeGuard — 100-case evaluation manifest v2",
   "test_cases": [
     {
-      "id": "S1",
-      "branch": "safe/readme-update",
-      "description": "README.md 수정",
-      "category": "safe",
+      "id": "A01",
+      "branch": "eval/case-001",
+      "pr_title": "feat: add user management endpoint",
+      "commit_message": "feat: add bulk user deletion endpoint",
+      "description": "/admin/users DELETE 인증 없음",
+      "category": "authorization",
+      "pipeline_type": "security_check",
       "expected": {
-        "should_find": false,
-        "note": "문서 파일 변경 — SKIP 또는 LOW"
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authorization"]
       }
     },
     {
-      "id": "S2",
-      "branch": "safe/test-addition",
+      "id": "S01",
+      "branch": "eval/case-002",
+      "pr_title": "docs: update project README",
+      "commit_message": "docs: update project README",
+      "description": "README.md 수정",
+      "category": "safe",
+      "pipeline_type": "skip",
+      "expected": {
+        "should_find": false,
+        "note": "exclude_paths에 README.md 포함"
+      }
+    },
+    {
+      "id": "T01",
+      "branch": "eval/case-003",
+      "pr_title": "feat: add user data retrieval",
+      "commit_message": "feat: add admin user data retrieval endpoint",
+      "description": "admin user-data endpoint에 로그인 체크 없음",
+      "category": "authentication",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["authentication"]
+      }
+    },
+    {
+      "id": "G01",
+      "branch": "eval/case-004",
+      "pr_title": "feat: add user name search",
+      "commit_message": "feat: add user name search endpoint",
+      "description": "f-string SQL injection in search",
+      "category": "injection",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E01",
+      "branch": "eval/case-005",
+      "pr_title": "feat: add AI service integration",
+      "commit_message": "feat: integrate OpenAI API for completions",
+      "description": "OPENAI_API_KEY = \"sk-abc123...\" 하드코딩",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S02",
+      "branch": "eval/case-006",
+      "pr_title": "test: add authentication tests",
+      "commit_message": "test: add authentication unit tests",
       "description": "tests/ 디렉토리에 테스트 추가",
       "category": "safe",
+      "pipeline_type": "skip",
       "expected": {
         "should_find": false,
         "note": "exclude_paths에 tests/ 포함"
       }
     },
     {
-      "id": "S3",
-      "branch": "safe/public-endpoint",
-      "description": "/public/info GET 추가 (인증 불필요)",
-      "category": "safe",
+      "id": "A02",
+      "branch": "eval/case-007",
+      "pr_title": "feat: add settings management endpoint",
+      "commit_message": "feat: add admin settings management endpoint",
+      "description": "/admin/settings DELETE + get_current_user (admin 아님)",
+      "category": "authorization",
+      "pipeline_type": "security_check",
       "expected": {
-        "should_find": false,
-        "note": "public 경로는 인증 불필요"
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["authorization"]
       }
     },
     {
-      "id": "S4",
-      "branch": "safe/admin-with-auth",
-      "description": "/admin/reports GET + require_admin",
-      "category": "safe",
+      "id": "T02",
+      "branch": "eval/case-008",
+      "pr_title": "refactor: update token processing logic",
+      "commit_message": "refactor: simplify token decoding process",
+      "description": "JWT 검증 로직 주석 처리, base64 decode만 수행",
+      "category": "authentication",
+      "pipeline_type": "security_check",
       "expected": {
-        "should_find": false,
-        "note": "정상적인 admin 보호 엔드포인트"
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authentication"]
       }
     },
     {
-      "id": "S5",
-      "branch": "safe/user-endpoint",
-      "description": "/users/profile GET + get_current_user",
-      "category": "safe",
+      "id": "G02",
+      "branch": "eval/case-009",
+      "pr_title": "feat: add network connectivity check",
+      "commit_message": "feat: add network connectivity diagnostic endpoint",
+      "description": "subprocess.call(shell=True) command injection",
+      "category": "injection",
+      "pipeline_type": "security_check",
       "expected": {
-        "should_find": false,
-        "note": "정상적인 user 보호 엔드포인트"
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["injection"]
       }
     },
     {
-      "id": "S6",
-      "branch": "safe/docs-update",
-      "description": "docs/ 파일 수정",
+      "id": "E02",
+      "branch": "eval/case-010",
+      "pr_title": "refactor: update JWT secret handling",
+      "commit_message": "refactor: update JWT secret configuration",
+      "description": "JWT_SECRET = \"mysecret\" jwt_handler에 하드코딩",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S03",
+      "branch": "eval/case-011",
+      "pr_title": "docs: update API documentation",
+      "commit_message": "docs: update API reference documentation",
+      "description": "docs/ API 문서 수정",
       "category": "safe",
+      "pipeline_type": "skip",
       "expected": {
         "should_find": false,
         "note": "exclude_paths에 docs/ 포함"
       }
     },
     {
-      "id": "S7",
-      "branch": "safe/refactor-logic",
-      "description": "admin endpoint 내부 로직 변경 (auth 유지)",
-      "category": "safe",
+      "id": "A03",
+      "branch": "eval/case-012",
+      "pr_title": "feat: add dashboard statistics",
+      "commit_message": "feat: add admin dashboard statistics endpoint",
+      "description": "/admin/stats GET 인증 없음",
+      "category": "authorization",
+      "pipeline_type": "security_check",
       "expected": {
-        "should_find": false,
-        "note": "auth Depends 유지 — Regression 없음"
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["authorization"]
       }
     },
     {
-      "id": "S8",
-      "branch": "safe/custom-auth",
-      "description": "/admin/export + verify_and_require_admin 자체구현",
-      "category": "safe",
+      "id": "T03",
+      "branch": "eval/case-013",
+      "pr_title": "feat: add flexible user access",
+      "commit_message": "feat: add configurable user access list",
+      "description": "session 우회 via BYPASS_USERS = [\"debug_user\", \"test_admin\"] 리스트",
+      "category": "authentication",
+      "pipeline_type": "security_check",
       "expected": {
-        "should_find": false,
-        "note": "Bedrock이 custom auth 패턴을 안전하다 판단"
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authentication"]
       }
     },
     {
-      "id": "S9",
-      "branch": "safe/config-safe",
-      "description": "config.py에서 os.environ 사용 (정상)",
-      "category": "safe",
+      "id": "G03",
+      "branch": "eval/case-014",
+      "pr_title": "feat: add expression evaluation endpoint",
+      "commit_message": "feat: add dynamic expression evaluation",
+      "description": "eval(user_expression) 코드 실행",
+      "category": "injection",
+      "pipeline_type": "security_check",
       "expected": {
-        "should_find": false,
-        "note": "환경변수 참조 — 하드코딩 없음"
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["injection"]
       }
     },
     {
-      "id": "S10",
-      "branch": "safe/migration",
-      "description": "migrations/ 파일 추가",
+      "id": "E03",
+      "branch": "eval/case-015",
+      "pr_title": "feat: add direct database configuration",
+      "commit_message": "feat: add direct database connection configuration",
+      "description": "DB_PASSWORD = \"admin123\" 하드코딩",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S04",
+      "branch": "eval/case-016",
+      "pr_title": "chore: add database migration",
+      "commit_message": "chore: add database migration script",
+      "description": "migrations/ SQL 파일 추가",
       "category": "safe",
+      "pipeline_type": "skip",
       "expected": {
         "should_find": false,
         "note": "exclude_paths에 migrations/ 포함"
       }
     },
     {
-      "id": "A1",
-      "branch": "vuln/admin-no-auth",
-      "description": "/admin/users DELETE 인증 없음",
+      "id": "A04",
+      "branch": "eval/case-017",
+      "pr_title": "feat: add bulk operations endpoint",
+      "commit_message": "feat: add admin bulk delete operations endpoint",
+      "description": "/admin/bulk-delete POST 인증 없음",
       "category": "authorization",
+      "pipeline_type": "security_check",
       "expected": {
         "should_find": true,
         "min_severity": "HIGH",
-        "expected_category": "authorization"
+        "expected_categories": ["authorization"]
       }
     },
     {
-      "id": "A2",
-      "branch": "vuln/admin-wrong-level",
-      "description": "/admin/settings DELETE + get_current_user (admin 아님)",
-      "category": "authorization",
+      "id": "T04",
+      "branch": "eval/case-018",
+      "pr_title": "refactor: update JWT validation options",
+      "commit_message": "refactor: update JWT decode options",
+      "description": "JWT 만료 검증 비활성화 options={\"verify_exp\": False}",
+      "category": "authentication",
+      "pipeline_type": "security_check",
       "expected": {
         "should_find": true,
         "min_severity": "HIGH",
-        "expected_category": "authorization"
+        "expected_categories": ["authentication"]
       }
     },
     {
-      "id": "A3",
-      "branch": "vuln/admin-get-no-auth",
-      "description": "/admin/stats GET 인증 없음",
+      "id": "G04",
+      "branch": "eval/case-019",
+      "pr_title": "feat: add session restore endpoint",
+      "commit_message": "feat: add session restore from binary data",
+      "description": "pickle.loads(base64_session) 역직렬화",
+      "category": "injection",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E04",
+      "branch": "eval/case-020",
+      "pr_title": "feat: add AWS service integration",
+      "commit_message": "feat: integrate AWS services with direct credentials",
+      "description": "AWS_SECRET_ACCESS_KEY 값 직접 하드코딩",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S05",
+      "branch": "eval/case-021",
+      "pr_title": "chore: add schema migration script",
+      "commit_message": "chore: add alembic schema migration",
+      "description": "alembic migration 파일 추가",
+      "category": "safe",
+      "pipeline_type": "skip",
+      "expected": {
+        "should_find": false,
+        "note": "exclude_paths에 migrations/ 포함"
+      }
+    },
+    {
+      "id": "A05",
+      "branch": "eval/case-022",
+      "pr_title": "refactor: simplify dashboard access control",
+      "commit_message": "refactor: update dashboard route handler",
+      "description": "기존 /admin/dashboard에서 require_admin 제거",
       "category": "authorization",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authorization"]
+      }
+    },
+    {
+      "id": "T05",
+      "branch": "eval/case-023",
+      "pr_title": "feat: add development mode configuration",
+      "commit_message": "feat: add debug mode environment configuration",
+      "description": "DEBUG env var로 모든 인증 우회 가능",
+      "category": "authentication",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authentication"]
+      }
+    },
+    {
+      "id": "G05",
+      "branch": "eval/case-024",
+      "pr_title": "feat: add configuration import",
+      "commit_message": "feat: add YAML configuration import endpoint",
+      "description": "yaml.load() SafeLoader 미사용",
+      "category": "injection",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E05",
+      "branch": "eval/case-025",
+      "pr_title": "docs: add GitHub integration notes",
+      "commit_message": "docs: document GitHub API integration",
+      "description": "# token: ghp_xxx 주석에 GitHub 토큰",
+      "category": "secret",
+      "pipeline_type": "security_check",
       "expected": {
         "should_find": true,
         "min_severity": "MEDIUM",
-        "expected_category": "authorization"
+        "expected_categories": ["secret"]
       }
     },
     {
-      "id": "A4",
-      "branch": "vuln/admin-post-no-auth",
-      "description": "/admin/bulk-delete POST 인증 없음",
-      "category": "authorization",
+      "id": "S06",
+      "branch": "eval/case-026",
+      "pr_title": "chore: update gitignore rules",
+      "commit_message": "chore: update gitignore patterns",
+      "description": ".gitignore 수정",
+      "category": "safe",
+      "pipeline_type": "skip",
       "expected": {
-        "should_find": true,
-        "min_severity": "HIGH",
-        "expected_category": "authorization"
+        "should_find": false,
+        "note": "exclude_paths에 .gitignore 포함"
       }
     },
     {
-      "id": "A5",
-      "branch": "vuln/remove-auth",
-      "description": "기존 /admin/dashboard에서 require_admin 제거",
+      "id": "A06",
+      "branch": "eval/case-027",
+      "pr_title": "feat: add admin audit and management APIs",
+      "commit_message": "feat: add audit-log, clear-log, impersonate endpoints",
+      "description": "audit-log, clear-log, impersonate 3개 admin endpoint 모두 인증 없음",
       "category": "authorization",
-      "expected": {
-        "should_find": true,
-        "min_severity": "CRITICAL",
-        "expected_category": "authorization"
-      }
-    },
-    {
-      "id": "A6",
-      "branch": "vuln/internal-no-auth",
-      "description": "/internal/config GET 인증 없음",
-      "category": "authorization",
-      "expected": {
-        "should_find": true,
-        "min_severity": "HIGH",
-        "expected_category": "authorization"
-      }
-    },
-    {
-      "id": "A7",
-      "branch": "vuln/admin-multiple",
-      "description": "/admin에 3개 endpoint 추가, 모두 인증 없음",
-      "category": "authorization",
-      "expected": {
-        "should_find": true,
-        "min_severity": "HIGH",
-        "expected_category": "authorization"
-      }
-    },
-    {
-      "id": "A8",
-      "branch": "vuln/middleware-remove",
-      "description": "admin.py에서 require_admin import 제거 후 모든 auth 삭제",
-      "category": "authorization",
+      "pipeline_type": "security_check",
       "expected": {
         "should_find": true,
         "min_severity": "CRITICAL",
-        "expected_category": "authorization"
+        "expected_categories": ["authorization"]
       }
     },
     {
-      "id": "A9",
-      "branch": "vuln/partial-auth",
-      "description": "/admin CRUD 4개 중 2개만 require_admin",
-      "category": "authorization",
+      "id": "T06",
+      "branch": "eval/case-028",
+      "pr_title": "refactor: update JWT algorithm support",
+      "commit_message": "refactor: expand supported JWT algorithms",
+      "description": "JWT 알고리즘 목록에 'none' 허용",
+      "category": "authentication",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authentication"]
+      }
+    },
+    {
+      "id": "G06",
+      "branch": "eval/case-029",
+      "pr_title": "feat: add file reading endpoint",
+      "commit_message": "feat: add static file reading endpoint",
+      "description": "path traversal via open(f\"static/{filename}\") 경로 검증 없음",
+      "category": "injection",
+      "pipeline_type": "security_check",
       "expected": {
         "should_find": true,
         "min_severity": "HIGH",
-        "expected_category": "authorization"
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E06",
+      "branch": "eval/case-030",
+      "pr_title": "refactor: add JWT configuration fallback",
+      "commit_message": "refactor: add fallback for JWT secret configuration",
+      "description": "JWT_SECRET_KEY = os.getenv(\"JWT_SECRET_KEY\", \"super-secret-fallback-2024\") 하드코딩 fallback",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S07",
+      "branch": "eval/case-031",
+      "pr_title": "docs: improve API reference",
+      "commit_message": "docs: improve API reference documentation",
+      "description": "docs/API.md 수정",
+      "category": "safe",
+      "pipeline_type": "skip",
+      "expected": {
+        "should_find": false,
+        "note": "exclude_paths에 docs/ 포함"
+      }
+    },
+    {
+      "id": "A07",
+      "branch": "eval/case-032",
+      "pr_title": "refactor: update admin router configuration",
+      "commit_message": "refactor: reorganize admin router handlers",
+      "description": "admin.py에서 모든 require_admin 제거",
+      "category": "authorization",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authorization"]
+      }
+    },
+    {
+      "id": "T07",
+      "branch": "eval/case-033",
+      "pr_title": "feat: add anonymous user support",
+      "commit_message": "feat: add anonymous fallback for unauthenticated requests",
+      "description": "verify_token이 None 반환 시 anonymous 하드코딩 fallback 반환",
+      "category": "authentication",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authentication"]
+      }
+    },
+    {
+      "id": "G07",
+      "branch": "eval/case-034",
+      "pr_title": "feat: add personalized greeting",
+      "commit_message": "feat: add personalized greeting endpoint",
+      "description": "Jinja2 템플릿 인젝션 via 사용자 제어 template string",
+      "category": "injection",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E07",
+      "branch": "eval/case-035",
+      "pr_title": "feat: add Slack notification support",
+      "commit_message": "feat: add Slack webhook notifications",
+      "description": "SLACK_WEBHOOK_URL 하드코딩",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S08",
+      "branch": "eval/case-036",
+      "pr_title": "test: add route integration tests",
+      "commit_message": "test: add integration tests for routes",
+      "description": "tests/test_routes.py 추가",
+      "category": "safe",
+      "pipeline_type": "skip",
+      "expected": {
+        "should_find": false,
+        "note": "exclude_paths에 tests/ 포함"
+      }
+    },
+    {
+      "id": "A08",
+      "branch": "eval/case-037",
+      "pr_title": "feat: add user profile lookup",
+      "commit_message": "feat: add user profile lookup by ID",
+      "description": "IDOR — GET /users/{user_id}/profile 소유권 확인 없음",
+      "category": "authorization",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["authorization"]
+      }
+    },
+    {
+      "id": "T08",
+      "branch": "eval/case-038",
+      "pr_title": "feat: add user authentication endpoint",
+      "commit_message": "feat: add login endpoint for user authentication",
+      "description": "login endpoint에서 빈 패스워드로 토큰 발급 가능",
+      "category": "authentication",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["authentication"]
+      }
+    },
+    {
+      "id": "G08",
+      "branch": "eval/case-039",
+      "pr_title": "feat: add directory user search",
+      "commit_message": "feat: add LDAP directory user search",
+      "description": "LDAP 필터 문자열 직접 concatenation",
+      "category": "injection",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E08",
+      "branch": "eval/case-040",
+      "pr_title": "feat: add email service integration",
+      "commit_message": "feat: integrate SendGrid for transactional emails",
+      "description": "SENDGRID_API_KEY 하드코딩",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S09",
+      "branch": "eval/case-041",
+      "pr_title": "chore: optimize query indexes",
+      "commit_message": "chore: add database index migration",
+      "description": "migrations/add_index.sql 추가",
+      "category": "safe",
+      "pipeline_type": "skip",
+      "expected": {
+        "should_find": false,
+        "note": "exclude_paths에 migrations/ 포함"
+      }
+    },
+    {
+      "id": "A09",
+      "branch": "eval/case-042",
+      "pr_title": "feat: add financial reporting endpoint",
+      "commit_message": "feat: add admin financial report endpoint",
+      "description": "/admin/financial-report + get_current_user (require_admin 아님)",
+      "category": "authorization",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["authorization"]
+      }
+    },
+    {
+      "id": "T09",
+      "branch": "eval/case-043",
+      "pr_title": "feat: add flexible token authentication",
+      "commit_message": "feat: support token in query parameter",
+      "description": "쿼리 파라미터 ?token=xxx 로 인증 가능 (헤더 우회)",
+      "category": "authentication",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["authentication"]
+      }
+    },
+    {
+      "id": "G09",
+      "branch": "eval/case-044",
+      "pr_title": "feat: add system diagnostics",
+      "commit_message": "feat: add system diagnostics endpoint",
+      "description": "os.system(user_input) injection",
+      "category": "injection",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E09",
+      "branch": "eval/case-045",
+      "pr_title": "feat: add third-party integrations",
+      "commit_message": "feat: add GitHub, Twitter, Discord integrations",
+      "description": "GitHub·Twitter·Discord 시크릿 다수 하드코딩",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S10",
+      "branch": "eval/case-046",
+      "pr_title": "test: add product endpoint tests",
+      "commit_message": "test: add product endpoint unit tests",
+      "description": "tests/test_products.py 추가",
+      "category": "safe",
+      "pipeline_type": "skip",
+      "expected": {
+        "should_find": false,
+        "note": "exclude_paths에 tests/ 포함"
       }
     },
     {
       "id": "A10",
-      "branch": "vuln/decorator-missing",
-      "description": "주석으로 @require_admin 언급하지만 Depends 없음",
+      "branch": "eval/case-047",
+      "pr_title": "feat: add user data export",
+      "commit_message": "feat: add admin user data export endpoint",
+      "description": "/admin/export/users 인증 없음, 전체 사용자 데이터 반환",
       "category": "authorization",
-      "expected": {
-        "should_find": true,
-        "min_severity": "MEDIUM",
-        "expected_category": "authorization"
-      }
-    },
-    {
-      "id": "E1",
-      "branch": "vuln/hardcoded-key",
-      "description": "API_KEY = \"sk-abc123...\" 하드코딩",
-      "category": "secret",
-      "expected": {
-        "should_find": true,
-        "min_severity": "HIGH",
-        "expected_category": "secret"
-      }
-    },
-    {
-      "id": "E2",
-      "branch": "vuln/jwt-secret",
-      "description": "JWT_SECRET = \"mysecret\" 하드코딩",
-      "category": "secret",
-      "expected": {
-        "should_find": true,
-        "min_severity": "HIGH",
-        "expected_category": "secret"
-      }
-    },
-    {
-      "id": "E3",
-      "branch": "vuln/db-password",
-      "description": "DB_PASSWORD = \"admin123\" 하드코딩",
-      "category": "secret",
-      "expected": {
-        "should_find": true,
-        "min_severity": "HIGH",
-        "expected_category": "secret"
-      }
-    },
-    {
-      "id": "E4",
-      "branch": "vuln/env-in-code",
-      "description": "AWS_SECRET_ACCESS_KEY 값 직접 하드코딩",
-      "category": "secret",
+      "pipeline_type": "security_check",
       "expected": {
         "should_find": true,
         "min_severity": "CRITICAL",
-        "expected_category": "secret"
+        "expected_categories": ["authorization"]
       }
     },
     {
-      "id": "E5",
-      "branch": "vuln/token-in-comment",
-      "description": "# token: ghp_xxxx 주석에 GitHub 토큰",
-      "category": "secret",
-      "expected": {
-        "should_find": true,
-        "min_severity": "MEDIUM",
-        "expected_category": "secret"
-      }
-    },
-    {
-      "id": "T1",
-      "branch": "vuln/no-login-check",
-      "description": "보호된 admin 페이지에 로그인 체크 없음",
+      "id": "T10",
+      "branch": "eval/case-048",
+      "pr_title": "refactor: simplify JWT key configuration",
+      "commit_message": "refactor: simplify JWT signing key setup",
+      "description": "JWT signing key가 빈 문자열 \"\"로 하드코딩 (항상 검증 통과)",
       "category": "authentication",
-      "expected": {
-        "should_find": true,
-        "min_severity": "HIGH",
-        "expected_category": "authentication"
-      }
-    },
-    {
-      "id": "T2",
-      "branch": "vuln/token-verify-skip",
-      "description": "token 검증 로직 주석 처리",
-      "category": "authentication",
+      "pipeline_type": "security_check",
       "expected": {
         "should_find": true,
         "min_severity": "CRITICAL",
-        "expected_category": "authentication"
+        "expected_categories": ["authentication"]
       }
     },
     {
-      "id": "T3",
-      "branch": "vuln/session-bypass",
-      "description": "session 검증 우회 코드 추가",
+      "id": "G10",
+      "branch": "eval/case-049",
+      "pr_title": "feat: add XML data import",
+      "commit_message": "feat: add XML data import endpoint",
+      "description": "외부 엔티티 비활성화 없이 XML 파싱 (XXE)",
+      "category": "injection",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E10",
+      "branch": "eval/case-050",
+      "pr_title": "feat: add payment processing",
+      "commit_message": "feat: integrate Stripe payment processing",
+      "description": "STRIPE_SECRET_KEY = \"sk_live_...\" 하드코딩",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S11",
+      "branch": "eval/case-051",
+      "pr_title": "feat: add public info endpoint",
+      "commit_message": "feat: add public info endpoint",
+      "description": "/public/info GET (인증 불필요, public 경로)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "public 경로는 인증 불필요 — 정상 설계"
+      }
+    },
+    {
+      "id": "A11",
+      "branch": "eval/case-052",
+      "pr_title": "feat: allow users to update their role",
+      "commit_message": "feat: add user role self-update endpoint",
+      "description": "PUT /users/me/role — get_current_user만으로 role 변경 허용",
+      "category": "authorization",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authorization"]
+      }
+    },
+    {
+      "id": "T11",
+      "branch": "eval/case-053",
+      "pr_title": "feat: add MFA bypass for testing",
+      "commit_message": "feat: add MFA bypass code for testing",
+      "description": "MFA magic code \"000000\" 으로 우회 가능",
       "category": "authentication",
+      "pipeline_type": "security_check",
       "expected": {
         "should_find": true,
-        "min_severity": "HIGH",
-        "expected_category": "authentication"
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authentication"]
       }
     },
     {
-      "id": "G1",
-      "branch": "vuln/sql-injection",
-      "description": "f-string SQL injection",
+      "id": "G11",
+      "branch": "eval/case-054",
+      "pr_title": "feat: add binary data import",
+      "commit_message": "feat: add binary data import endpoint",
+      "description": "marshal.loads(user_data) 역직렬화",
       "category": "injection",
+      "pipeline_type": "security_check",
       "expected": {
         "should_find": true,
-        "min_severity": "HIGH",
-        "expected_category": "injection"
+        "min_severity": "CRITICAL",
+        "expected_categories": ["injection"]
       }
     },
     {
-      "id": "G2",
-      "branch": "vuln/command-injection",
-      "description": "subprocess.call(shell=True) command injection",
+      "id": "E11",
+      "branch": "eval/case-055",
+      "pr_title": "feat: add asymmetric JWT signing",
+      "commit_message": "feat: add RSA-based JWT signing support",
+      "description": "RSA private key 내용을 소스 코드에 직접 포함",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S12",
+      "branch": "eval/case-056",
+      "pr_title": "feat: add admin reports endpoint",
+      "commit_message": "feat: add admin reports endpoint with auth",
+      "description": "/admin/reports GET + require_admin",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "정상적인 admin 보호 엔드포인트"
+      }
+    },
+    {
+      "id": "A12",
+      "branch": "eval/case-057",
+      "pr_title": "feat: add internal user listing API",
+      "commit_message": "feat: add internal user listing endpoint",
+      "description": "/internal/users 인증 없음, 해시 패스워드 포함 전체 사용자 반환",
+      "category": "authorization",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authorization"]
+      }
+    },
+    {
+      "id": "T12",
+      "branch": "eval/case-058",
+      "pr_title": "refactor: optimize password validation",
+      "commit_message": "refactor: simplify password validation logic",
+      "description": "password check가 non-empty 입력에 항상 True 반환",
+      "category": "authentication",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authentication"]
+      }
+    },
+    {
+      "id": "G12",
+      "branch": "eval/case-059",
+      "pr_title": "feat: add URL proxy endpoint",
+      "commit_message": "feat: add URL proxy for external requests",
+      "description": "SSRF via requests.get(user_url) 미검증",
       "category": "injection",
+      "pipeline_type": "security_check",
       "expected": {
         "should_find": true,
         "min_severity": "HIGH",
-        "expected_category": "injection"
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E12",
+      "branch": "eval/case-060",
+      "pr_title": "feat: add Google OAuth support",
+      "commit_message": "feat: add Google OAuth2 authentication",
+      "description": "GOOGLE_CLIENT_SECRET 하드코딩",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S13",
+      "branch": "eval/case-061",
+      "pr_title": "feat: extend user profile API",
+      "commit_message": "feat: extend user profile endpoint",
+      "description": "/users/profile GET + get_current_user",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "정상적인 user 보호 엔드포인트"
+      }
+    },
+    {
+      "id": "A13",
+      "branch": "eval/case-062",
+      "pr_title": "feat: add debug configuration endpoint",
+      "commit_message": "feat: add debug configuration info endpoint",
+      "description": "/debug/config 인증 없음, DATABASE_URL·JWT 시크릿 반환",
+      "category": "authorization",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authorization"]
+      }
+    },
+    {
+      "id": "T13",
+      "branch": "eval/case-063",
+      "pr_title": "feat: add admin account creation",
+      "commit_message": "feat: add admin account creation endpoint",
+      "description": "admin 계정 생성 시 이메일 검증 없음",
+      "category": "authentication",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["authentication"]
+      }
+    },
+    {
+      "id": "G13",
+      "branch": "eval/case-064",
+      "pr_title": "feat: add template rendering",
+      "commit_message": "feat: add custom template rendering endpoint",
+      "description": "jinja2.Environment(autoescape=False) + user input 렌더링",
+      "category": "injection",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E13",
+      "branch": "eval/case-065",
+      "pr_title": "feat: configure Redis with credentials",
+      "commit_message": "feat: configure Redis connection with credentials",
+      "description": "REDIS_URL에 프로덕션 패스워드 하드코딩 \"redis://:prodpassword@host:6379\"",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S14",
+      "branch": "eval/case-066",
+      "pr_title": "refactor: improve admin handler",
+      "commit_message": "refactor: improve admin handler logic",
+      "description": "admin 로직 리팩토링, auth 유지",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "리팩토링 — auth 보호 유지됨"
+      }
+    },
+    {
+      "id": "A14",
+      "branch": "eval/case-067",
+      "pr_title": "feat: add user role promotion",
+      "commit_message": "feat: add user role promotion endpoint",
+      "description": "admin 자가 승격 POST /users/make-admin, 2차 검증 없음",
+      "category": "authorization",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["authorization"]
+      }
+    },
+    {
+      "id": "T14",
+      "branch": "eval/case-068",
+      "pr_title": "feat: add logout functionality",
+      "commit_message": "feat: add user logout endpoint",
+      "description": "logout 시 토큰 무효화 없음",
+      "category": "authentication",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["authentication"]
+      }
+    },
+    {
+      "id": "G14",
+      "branch": "eval/case-069",
+      "pr_title": "feat: add product search by name",
+      "commit_message": "feat: add product search by name endpoint",
+      "description": "SQL concatenation f\"SELECT * FROM products WHERE name = '{q}'\"",
+      "category": "injection",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E14",
+      "branch": "eval/case-070",
+      "pr_title": "feat: add SMS notification service",
+      "commit_message": "feat: integrate Twilio for SMS notifications",
+      "description": "TWILIO_AUTH_TOKEN 하드코딩",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S15",
+      "branch": "eval/case-071",
+      "pr_title": "refactor: centralize configuration",
+      "commit_message": "refactor: centralize app configuration",
+      "description": "config.py에서 os.environ 사용 (하드코딩 없음)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "환경변수 참조 — 하드코딩 없음"
+      }
+    },
+    {
+      "id": "A15",
+      "branch": "eval/case-072",
+      "pr_title": "feat: add admin search functionality",
+      "commit_message": "feat: add admin search across users and orders",
+      "description": "/admin/search?q=... 인증 없음",
+      "category": "authorization",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "HIGH",
+        "expected_categories": ["authorization"]
+      }
+    },
+    {
+      "id": "T15",
+      "branch": "eval/case-073",
+      "pr_title": "refactor: optimize string comparison",
+      "commit_message": "refactor: optimize password comparison performance",
+      "description": "timing-vulnerable 패스워드 비교 (mismatch 시 early return)",
+      "category": "authentication",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "MEDIUM",
+        "expected_categories": ["authentication"]
+      }
+    },
+    {
+      "id": "G15",
+      "branch": "eval/case-074",
+      "pr_title": "feat: add log pattern search",
+      "commit_message": "feat: add log file pattern search endpoint",
+      "description": "os.popen(f\"grep {pattern} logs.txt\") log search injection",
+      "category": "injection",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["injection"]
+      }
+    },
+    {
+      "id": "E15",
+      "branch": "eval/case-075",
+      "pr_title": "feat: add cloud storage integration",
+      "commit_message": "feat: integrate Azure and GCP cloud storage",
+      "description": "Azure 연결 문자열 + GCP 서비스 계정 키 하드코딩",
+      "category": "secret",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": true,
+        "min_severity": "CRITICAL",
+        "expected_categories": ["secret"]
+      }
+    },
+    {
+      "id": "S16",
+      "branch": "eval/case-076",
+      "pr_title": "feat: add pagination to user list",
+      "commit_message": "feat: add pagination to admin user list",
+      "description": "admin list_users에 skip/limit 페이지네이션 추가 (require_admin 유지)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "기능 추가 — require_admin 유지됨"
+      }
+    },
+    {
+      "id": "S17",
+      "branch": "eval/case-077",
+      "pr_title": "feat: add product detail endpoint",
+      "commit_message": "feat: add product detail lookup endpoint",
+      "description": "GET /products/{id} + get_current_user",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "정상적인 user 보호 엔드포인트"
+      }
+    },
+    {
+      "id": "S18",
+      "branch": "eval/case-078",
+      "pr_title": "feat: extend health monitoring",
+      "commit_message": "feat: extend health check with DB and uptime",
+      "description": "health check에 DB 상태·업타임 포함 (공개 엔드포인트)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "health는 원래 public — 문제 없음"
+      }
+    },
+    {
+      "id": "S19",
+      "branch": "eval/case-079",
+      "pr_title": "feat: add global error handling",
+      "commit_message": "feat: add global error handler middleware",
+      "description": "전역 HTTPException 핸들러 추가 (auth 변경 없음)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "에러 처리 개선 — auth 변경 없음"
+      }
+    },
+    {
+      "id": "S20",
+      "branch": "eval/case-080",
+      "pr_title": "feat: add audit event log endpoint",
+      "commit_message": "feat: add admin audit event log endpoint",
+      "description": "/admin/audit-events GET + require_admin",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "정상적인 admin 보호 엔드포인트"
+      }
+    },
+    {
+      "id": "S21",
+      "branch": "eval/case-081",
+      "pr_title": "feat: add password hashing utility",
+      "commit_message": "feat: add bcrypt password hashing utility",
+      "description": "bcrypt 패스워드 해시 모듈 추가 (하드코딩 없음)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "보안 강화 — 시크릿 없음"
+      }
+    },
+    {
+      "id": "S22",
+      "branch": "eval/case-082",
+      "pr_title": "feat: add API rate limiting",
+      "commit_message": "feat: add rate limiting middleware",
+      "description": "rate limiting 미들웨어 추가",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "미들웨어 추가 — auth 보호 변경 없음"
+      }
+    },
+    {
+      "id": "S23",
+      "branch": "eval/case-083",
+      "pr_title": "feat: configure CORS for web clients",
+      "commit_message": "feat: configure CORS middleware from env vars",
+      "description": "CORSMiddleware를 환경변수 기반으로 설정",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "CORS 설정 — auth 변경 없음"
+      }
+    },
+    {
+      "id": "S24",
+      "branch": "eval/case-084",
+      "pr_title": "feat: add security response headers",
+      "commit_message": "feat: add security headers middleware",
+      "description": "보안 헤더 미들웨어 추가 (X-Frame-Options 등)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "보안 강화 — auth 변경 없음"
+      }
+    },
+    {
+      "id": "S25",
+      "branch": "eval/case-085",
+      "pr_title": "feat: add startup configuration check",
+      "commit_message": "feat: validate required env vars on startup",
+      "description": "시작 시 JWT_SECRET 비어있으면 raise 하는 검증 추가",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "보안 강화 — 하드코딩 없음"
+      }
+    },
+    {
+      "id": "S26",
+      "branch": "eval/case-086",
+      "pr_title": "chore: upgrade security dependencies",
+      "commit_message": "chore: upgrade security-related dependencies",
+      "description": "requirements.txt 보안 의존성 버전 업그레이드",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "의존성 업그레이드 — 코드 변경 없음"
+      }
+    },
+    {
+      "id": "S27",
+      "branch": "eval/case-087",
+      "pr_title": "feat: add request validation models",
+      "commit_message": "feat: add pydantic validation models for admin endpoints",
+      "description": "admin 엔드포인트에 Pydantic 입력 검증 모델 적용 (require_admin 유지)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "입력 검증 강화 — auth 유지됨"
+      }
+    },
+    {
+      "id": "S28",
+      "branch": "eval/case-088",
+      "pr_title": "feat: add password strength validation",
+      "commit_message": "feat: add password strength policy checker",
+      "description": "패스워드 강도 체커 추가 (하드코딩 없음)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "정책 유틸리티 — 시크릿 없음"
+      }
+    },
+    {
+      "id": "S29",
+      "branch": "eval/case-089",
+      "pr_title": "feat: add structured request logging",
+      "commit_message": "feat: add structured JSON logging",
+      "description": "구조화된 JSON 로깅 설정 추가 (민감정보 미포함)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "로깅 설정 — 시크릿 없음"
+      }
+    },
+    {
+      "id": "S30",
+      "branch": "eval/case-090",
+      "pr_title": "feat: add database connection pooling",
+      "commit_message": "feat: add SQLAlchemy connection pool configuration",
+      "description": "SQLAlchemy 커넥션 풀 설정 — 환경변수 기반",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "DB 설정 — 크리덴셜 하드코딩 없음"
+      }
+    },
+    {
+      "id": "S31",
+      "branch": "eval/case-091",
+      "pr_title": "refactor: rename token validation method",
+      "commit_message": "refactor: rename verify_token to validate_jwt_token",
+      "description": "verify_token → validate_jwt_token 이름 변경, 로직 동일",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "함수 이름 변경 — 검증 로직 동일"
+      }
+    },
+    {
+      "id": "S32",
+      "branch": "eval/case-092",
+      "pr_title": "feat: add enhanced export endpoint",
+      "commit_message": "feat: add export endpoint with enhanced auth",
+      "description": "custom verify_and_require_admin이 require_admin을 추가 검사로 감싸는 구조",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "Bedrock이 custom auth 패턴을 안전하다 판단"
+      }
+    },
+    {
+      "id": "S33",
+      "branch": "eval/case-093",
+      "pr_title": "refactor: standardize env var access",
+      "commit_message": "refactor: standardize environment variable access",
+      "description": "JWT_SECRET = os.getenv(\"JWT_SECRET_KEY\", \"\") — 빈 문자열 기본값, 실제 fallback 시크릿 아님",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "빈 문자열 기본값 — 하드코딩 시크릿 아님"
+      }
+    },
+    {
+      "id": "S34",
+      "branch": "eval/case-094",
+      "pr_title": "feat: add user search endpoint",
+      "commit_message": "feat: add parameterized user search endpoint",
+      "description": "parameterized SQL cursor.execute(\"SELECT * FROM users WHERE name = %s\", (q,))",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "파라미터화된 쿼리 — SQL injection 없음"
+      }
+    },
+    {
+      "id": "S35",
+      "branch": "eval/case-095",
+      "pr_title": "feat: add Firebase client configuration",
+      "commit_message": "feat: add Firebase client-side configuration",
+      "description": "Firebase apiKey·messagingSenderId — 공개 client-side config (비밀 아님)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "Firebase client config는 공개 값 — 시크릿 아님"
+      }
+    },
+    {
+      "id": "S36",
+      "branch": "eval/case-096",
+      "pr_title": "docs: add API usage examples in code",
+      "commit_message": "docs: add API usage examples in docstrings",
+      "description": "docstring에 # Example: Bearer eyJhbGci... — 예시 토큰, 실제 아님",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "docstring 예시 토큰 — 실제 시크릿 아님"
+      }
+    },
+    {
+      "id": "S37",
+      "branch": "eval/case-097",
+      "pr_title": "refactor: extract auth middleware module",
+      "commit_message": "refactor: move auth middleware to separate module",
+      "description": "auth 미들웨어를 별도 파일로 이동 (여전히 적용됨)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "리팩토링 — auth 보호 유지됨"
+      }
+    },
+    {
+      "id": "S38",
+      "branch": "eval/case-098",
+      "pr_title": "feat: add superadmin access tier",
+      "commit_message": "feat: add superadmin tier wrapping require_admin",
+      "description": "require_superadmin이 require_admin을 추가 검사로 감싸는 구조",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "강화된 권한 계층 — 보안 향상"
+      }
+    },
+    {
+      "id": "S39",
+      "branch": "eval/case-099",
+      "pr_title": "feat: add Redis cache configuration",
+      "commit_message": "feat: add Redis cache configuration",
+      "description": "REDIS_URL = os.getenv(\"REDIS_URL\", \"redis://localhost:6379\") — localhost 기본값, 패스워드 없음",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "localhost 기본값 — 패스워드 없는 개발용 URL"
+      }
+    },
+    {
+      "id": "S40",
+      "branch": "eval/case-100",
+      "pr_title": "ci: add GitHub Actions CI workflow",
+      "commit_message": "ci: add GitHub Actions CI workflow",
+      "description": "CI GitHub Actions workflow yaml 추가 (시크릿 없음)",
+      "category": "safe",
+      "pipeline_type": "security_check",
+      "expected": {
+        "should_find": false,
+        "note": "CI 설정 파일 — 시크릿 없음"
       }
     }
   ]

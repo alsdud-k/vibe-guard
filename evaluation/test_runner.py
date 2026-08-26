@@ -117,6 +117,9 @@ class TestCase:
     description: str
     category: str
     expected: dict
+    pr_title: str = ""
+    commit_message: str = ""
+    pipeline_type: str = "security_check"
 
 
 @dataclass
@@ -334,7 +337,10 @@ def render_report(results: list[CaseResult], metrics: dict, run_at: str) -> str:
 def load_manifest(case_filter: list[str] | None) -> list[TestCase]:
     with open(MANIFEST_PATH) as f:
         data = json.load(f)
-    cases = [TestCase(**tc) for tc in data["test_cases"]]
+    cases = []
+    for tc in data["test_cases"]:
+        safe_tc = {k: v for k, v in tc.items() if k in TestCase.__dataclass_fields__}
+        cases.append(TestCase(**safe_tc))
     if case_filter:
         ids = {c.upper() for c in case_filter}
         cases = [c for c in cases if c.id.upper() in ids]
@@ -370,12 +376,13 @@ def run_case(
     start = time.time()
 
     try:
+        pr_title = case.pr_title or "Backend update"
         pr = gh.create_pr(
             repo=repo,
-            title=f"[VibeGuard Test] {case.id} — {case.description}",
+            title=pr_title,
             head=case.branch,
             base="main",
-            body=f"Automated test case `{case.id}` for VibeGuard evaluation.\n\nExpected: `{json.dumps(case.expected)}`",
+            body="Backend update for review.",
         )
         pr_number = pr["number"]
         print(f"  PR #{pr_number} created for {case.id} ({case.branch})")

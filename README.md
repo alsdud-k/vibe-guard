@@ -42,8 +42,8 @@ vibe-guard/
 │   └── github_commenter/   # PR Comment 생성/업데이트 + DynamoDB 저장
 ├── evaluation/
 │   ├── app/                # vibeguard-test-app 기반 코드 (FastAPI)
-│   ├── manifest.json       # 30개 테스트 케이스 정의
-│   ├── setup_test_repo.py  # 테스트 리포지토리 + 30개 브랜치 자동 생성
+│   ├── manifest.json       # 100개 테스트 케이스 정의
+│   ├── setup_test_repo.py  # 테스트 리포지토리 + 100개 브랜치 자동 생성
 │   └── test_runner.py      # E2E 평가 실행 + Precision/Recall/F1 측정
 ├── scripts/
 │   └── deploy.sh           # Lambda 코드 + Step Functions 배포 스크립트
@@ -156,15 +156,15 @@ python evaluation/setup_test_repo.py \
   [--create]   # API로 repo 자동 생성 시
 ```
 
-30개 브랜치가 자동으로 push됩니다.
+100개 브랜치가 자동으로 push됩니다.
 
 | 카테고리 | 브랜치 수 | 설명 |
 |---|---|---|
-| Safe | 10 | 정상 변경 (Finding 없어야 함) |
-| Authorization Regression | 10 | 인증 누락/약화 |
-| Secret Exposure | 5 | 하드코딩 시크릿 |
-| Authentication Regression | 3 | 인증 로직 우회 |
-| Injection | 2 | SQL/Command injection |
+| Safe | 40 | 정상 변경 (Finding 없어야 함, 하드 네거티브 포함) |
+| Authorization Regression | 15 | 인증 누락/약화/IDOR |
+| Authentication Regression | 15 | JWT 우회/MFA 우회/세션 취약점 |
+| Secret Exposure | 15 | 하드코딩 시크릿 |
+| Injection | 15 | SQL/Command/SSRF/XXE/역직렬화 |
 
 ### 2. E2E 평가 실행
 
@@ -189,22 +189,22 @@ evaluation/results/
 
 ## 평가 결과
 
-30개 테스트 케이스 E2E 평가 결과 (2026-08-24 기준):
+100개 테스트 케이스 E2E 평가 결과 (2026-08-26 기준):
 
 | 지표 | 값 |
 |---|---|
-| **Precision** | **1.000** |
-| **Recall** | **1.000** |
-| **F1 Score** | **1.000** |
-| False Positive Rate | 0.000 |
-| TP / FP / TN / FN | 20 / 0 / 10 / 0 |
-| 평균 응답시간 | 21초 |
+| **Precision** | **0.862** |
+| **Recall** | **0.933** |
+| **F1 Score** | **0.896** |
+| False Positive Rate | 0.225 |
+| TP / FP / TN / FN | 56 / 9 / 31 / 4 |
+| 평균 응답시간 | 19.6초 |
 
 ### 카테고리별 결과
 
-| 카테고리 | Precision | Recall | F1 |
-|---|---|---|---|
-| Authentication | 1.000 | 1.000 | **1.000** |
-| Injection | 1.000 | 1.000 | **1.000** |
-| Authorization | 1.000 | 1.000 | **1.000** |
-| Secret | 1.000 | 1.000 | **1.000** |
+| 카테고리 | Precision | Recall | F1 | 비고 |
+|---|---|---|---|---|
+| Authorization | 1.000 | 1.000 | **1.000** | 15/15 완벽 탐지 |
+| Injection | 1.000 | 1.000 | **1.000** | 15/15 완벽 탐지 |
+| Authentication | 1.000 | 0.933 | **0.966** | logout 토큰 무효화 미탐 1건 |
+| Secret | 1.000 | 0.800 | **0.889** | 비정형 시크릿 패턴 미탐 3건 |
